@@ -471,6 +471,11 @@ var SeestarJazz = (function() {
         updateFillRate();
     }
 
+    // Color diversity — stub for API compatibility (procedural engine doesn't use octave range)
+    function setColorDiversity(d) {
+        // no-op in procedural engine
+    }
+
     function suggestKey(newKey) {
         if (!autoTonality) return;
         if (newKey === rootNote) return;
@@ -719,7 +724,7 @@ var SeestarJazz = (function() {
         feed: feed, feedOverlay: feedOverlay,
         setVolume: setVolume, getVolume: getVolume, isRunning: isRunning,
         setReverb: setReverb,
-        setStarDensity: setStarDensity,
+        setStarDensity: setStarDensity, setColorDiversity: setColorDiversity,
         suggestKey: suggestKey, suggestScale: suggestScale,
         setAutoTonality: setAutoTonality, getAutoTonality: getAutoTonality,
         setKey: setKey, setScale: setScale,

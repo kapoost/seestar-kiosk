@@ -1,0 +1,517 @@
+/* Seestar Kiosk — Landing Page
+   Night-first, day-mode overrides via .day-mode on <html> */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html {
+    scroll-behavior: smooth;
+    background: #000;
+    color: #cc3333;
+    font-family: "SF Mono", "Menlo", "Consolas", monospace;
+    font-size: 16px;
+    letter-spacing: 0.05em;
+    line-height: 1.6;
+}
+
+body {
+    background: #000;
+    overflow-x: hidden;
+}
+
+a {
+    color: #ff4444;
+    text-decoration: none;
+    border-bottom: 1px solid #3a0000;
+    transition: border-color 0.2s;
+}
+
+a:hover {
+    border-bottom-color: #ff4444;
+}
+
+/* ── Sections ─────────────────────────────────────────── */
+
+section {
+    padding: 80px 24px;
+    max-width: 960px;
+    margin: 0 auto;
+    opacity: 0;
+    transform: translateY(20px);
+    transition: opacity 0.6s ease, transform 0.6s ease;
+}
+
+section.visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+h2 {
+    color: #cc3333;
+    font-size: 1.3rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 32px;
+    border-bottom: 1px solid #3a0000;
+    padding-bottom: 8px;
+}
+
+/* ── 1. Hero ──────────────────────────────────────────── */
+
+#hero {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    position: relative;
+    padding: 0 24px;
+    opacity: 1;
+    transform: none;
+}
+
+#star-canvas {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+}
+
+#hero-content {
+    position: relative;
+    z-index: 1;
+}
+
+.hero-title {
+    font-size: clamp(2rem, 5vw, 3.5rem);
+    font-weight: 700;
+    color: #cc3333;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    margin-bottom: 16px;
+}
+
+.hero-tagline {
+    color: #8b0000;
+    font-size: clamp(0.85rem, 2vw, 1.1rem);
+    font-style: italic;
+    margin-bottom: 40px;
+}
+
+.hero-ctas {
+    display: flex;
+    gap: 16px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.btn {
+    display: inline-block;
+    padding: 12px 28px;
+    border: 1px solid #cc3333;
+    border-radius: 6px;
+    color: #cc3333;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    background: rgba(5, 0, 0, 0.92);
+    transition: background 0.2s, color 0.2s;
+    cursor: pointer;
+}
+
+.btn:hover {
+    background: #2a0000;
+    color: #ff4444;
+    border-bottom: 1px solid #cc3333;
+}
+
+.btn-primary {
+    background: #2a0000;
+}
+
+.hero-hint {
+    position: absolute;
+    bottom: 32px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: #5a0000;
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    z-index: 1;
+    animation: hint-pulse 2s ease-in-out infinite;
+}
+
+@keyframes hint-pulse {
+    0%, 100% { opacity: 0.4; }
+    50% { opacity: 1; }
+}
+
+/* ── 2. Features ──────────────────────────────────────── */
+
+.features-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+}
+
+.feature-card {
+    background: rgba(5, 0, 0, 0.92);
+    border: 1px solid #3a0000;
+    border-radius: 8px;
+    padding: 24px;
+}
+
+.feature-icon {
+    font-size: 28px;
+    margin-bottom: 12px;
+}
+
+.feature-card h3 {
+    color: #cc3333;
+    font-size: 14px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 12px;
+}
+
+.feature-card ul {
+    list-style: none;
+    color: #8b0000;
+    font-size: 13px;
+    line-height: 1.8;
+}
+
+.feature-card li::before {
+    content: "- ";
+    color: #5a0000;
+}
+
+/* ── 3. Jazz Mapping ──────────────────────────────────── */
+
+.jazz-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+
+.jazz-table th {
+    color: #5a0000;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    text-align: left;
+    padding: 8px 12px;
+    border-bottom: 1px solid #3a0000;
+}
+
+.jazz-table td {
+    padding: 8px 12px;
+    border-bottom: 1px solid #1a0000;
+}
+
+.jazz-table .log-key {
+    color: #5a0000;
+}
+
+.jazz-table .log-val {
+    color: #cc3333;
+    font-weight: 600;
+}
+
+.jazz-table tr {
+    opacity: 0;
+    transform: translateY(10px);
+    transition: opacity 0.4s ease, transform 0.4s ease;
+}
+
+.jazz-table tr.visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.jazz-note {
+    color: #5a0000;
+    font-size: 13px;
+    font-style: italic;
+    margin-top: 24px;
+    text-align: center;
+}
+
+.jazz-note .note-icon {
+    display: inline-block;
+    animation: jazz-pulse 2s ease-in-out infinite;
+}
+
+@keyframes jazz-pulse {
+    0%, 100% { opacity: 0.6; }
+    50% { opacity: 1; }
+}
+
+/* ── 4. Architecture ──────────────────────────────────── */
+
+.arch-panel {
+    background: rgba(0, 0, 0, 0.7);
+    border: 1px solid #3a0000;
+    border-radius: 8px;
+    padding: 24px;
+    overflow-x: auto;
+}
+
+.arch-panel pre {
+    color: #8b0000;
+    font-size: 12px;
+    line-height: 1.6;
+    white-space: pre;
+}
+
+.arch-note {
+    color: #5a0000;
+    font-size: 13px;
+    font-style: italic;
+    margin-top: 20px;
+    text-align: center;
+}
+
+/* ── 5. Screenshot placeholder ────────────────────────── */
+
+.screenshot-placeholder {
+    border: 2px dashed #3a0000;
+    border-radius: 8px;
+    padding: 80px 24px;
+    text-align: center;
+    color: #5a0000;
+    font-size: 14px;
+}
+
+/* ── 6. Quick Start ───────────────────────────────────── */
+
+.steps {
+    counter-reset: step;
+}
+
+.step {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    margin-bottom: 20px;
+}
+
+.step-num {
+    color: #cc3333;
+    font-weight: 700;
+    font-size: 18px;
+    min-width: 28px;
+    text-align: right;
+    flex-shrink: 0;
+}
+
+.step-text {
+    color: #8b0000;
+    font-size: 14px;
+}
+
+.step-text code {
+    display: block;
+    background: rgba(5, 0, 0, 0.92);
+    border: 1px solid #2a0000;
+    border-radius: 4px;
+    padding: 8px 12px;
+    margin-top: 6px;
+    color: #cc3333;
+    font-size: 13px;
+    overflow-x: auto;
+}
+
+/* ── 7. Footer ────────────────────────────────────────── */
+
+footer {
+    padding: 40px 24px;
+    text-align: center;
+    color: #5a0000;
+    font-size: 12px;
+    border-top: 1px solid #1a0000;
+    max-width: 960px;
+    margin: 0 auto;
+}
+
+footer a {
+    color: #8b0000;
+}
+
+.credits {
+    margin-top: 12px;
+    font-size: 11px;
+    color: #3a0000;
+}
+
+.credits a {
+    color: #5a0000;
+}
+
+/* ═══════════════════════════════════════════════════════
+   Day mode — toggle with D key
+   ═══════════════════════════════════════════════════════ */
+
+.day-mode {
+    background: #1a1a2e;
+    color: #c8d0e0;
+}
+
+.day-mode body {
+    background: #1a1a2e;
+}
+
+.day-mode a {
+    color: #4a7dff;
+    border-bottom-color: #334;
+}
+
+.day-mode a:hover {
+    border-bottom-color: #4a7dff;
+}
+
+.day-mode h2 {
+    color: #fff;
+    border-bottom-color: #334;
+}
+
+.day-mode .hero-title {
+    color: #fff;
+}
+
+.day-mode .hero-tagline {
+    color: #8899bb;
+}
+
+.day-mode .btn {
+    background: rgba(245, 245, 250, 0.1);
+    border-color: #4a7dff;
+    color: #4a7dff;
+}
+
+.day-mode .btn:hover {
+    background: rgba(74, 125, 255, 0.15);
+    color: #6b9aff;
+    border-bottom-color: #4a7dff;
+}
+
+.day-mode .btn-primary {
+    background: rgba(74, 125, 255, 0.15);
+}
+
+.day-mode .hero-hint {
+    color: #556;
+}
+
+.day-mode .feature-card {
+    background: rgba(245, 245, 250, 0.05);
+    border-color: #334;
+}
+
+.day-mode .feature-card h3 {
+    color: #fff;
+}
+
+.day-mode .feature-card ul {
+    color: #8899bb;
+}
+
+.day-mode .feature-card li::before {
+    color: #556;
+}
+
+.day-mode .jazz-table th {
+    color: #667;
+    border-bottom-color: #334;
+}
+
+.day-mode .jazz-table td {
+    border-bottom-color: #223;
+}
+
+.day-mode .jazz-table .log-key {
+    color: #667;
+}
+
+.day-mode .jazz-table .log-val {
+    color: #c8d0e0;
+}
+
+.day-mode .jazz-note {
+    color: #556;
+}
+
+.day-mode .arch-panel {
+    background: rgba(245, 245, 250, 0.05);
+    border-color: #334;
+}
+
+.day-mode .arch-panel pre {
+    color: #8899bb;
+}
+
+.day-mode .arch-note {
+    color: #556;
+}
+
+.day-mode .screenshot-placeholder {
+    border-color: #334;
+    color: #556;
+}
+
+.day-mode .step-num {
+    color: #4a7dff;
+}
+
+.day-mode .step-text {
+    color: #8899bb;
+}
+
+.day-mode .step-text code {
+    background: rgba(0, 0, 0, 0.3);
+    border-color: #334;
+    color: #c8d0e0;
+}
+
+.day-mode footer {
+    color: #556;
+    border-top-color: #223;
+}
+
+.day-mode footer a {
+    color: #667;
+}
+
+.day-mode .credits {
+    color: #445;
+}
+
+.day-mode .credits a {
+    color: #556;
+}
+
+/* ═══════════════════════════════════════════════════════
+   Responsive
+   ═══════════════════════════════════════════════════════ */
+
+@media (max-width: 768px) {
+    .features-grid {
+        grid-template-columns: 1fr;
+    }
+
+    section {
+        padding: 60px 16px;
+    }
+
+    .arch-panel pre {
+        font-size: 10px;
+    }
+}

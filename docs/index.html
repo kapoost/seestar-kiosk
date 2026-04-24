@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Seestar Kiosk</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- Star canvas background -->
+<canvas id="star-canvas"></canvas>
+
+<!-- 1. Hero -->
+<section id="hero">
+    <div id="hero-content">
+        <h1 class="hero-title">Seestar Kiosk</h1>
+        <p class="hero-tagline">Live telescope view on a projector. Jazz from the stars.</p>
+        <div class="hero-ctas">
+            <a href="https://github.com/kapoost/seestar-kiosk" class="btn btn-primary">View on GitHub</a>
+            <a href="#architecture" class="btn">Read the Docs</a>
+        </div>
+    </div>
+    <div class="hero-hint">Press D for day mode</div>
+</section>
+
+<!-- 2. Features -->
+<section id="features">
+    <h2>Features</h2>
+    <div class="features-grid">
+        <div class="feature-card">
+            <div class="feature-icon">&#x1F52D;</div>
+            <h3>Telescope</h3>
+            <ul>
+                <li>Live MJPEG stream with auto-reconnect</li>
+                <li>Messier &amp; NGC/IC catalog with GoTo</li>
+                <li>Stacking, exposure, gain control</li>
+                <li>Video recording with timelapse</li>
+                <li>D-pad pilot, zoom, tracking, plate solve</li>
+                <li>Alt-az &amp; equatorial mount modes</li>
+            </ul>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon">&#x1F4F7;</div>
+            <h3>Wide Camera</h3>
+            <ul>
+                <li>Picture-in-Picture finder overlay</li>
+                <li>FOV rectangle on wide image</li>
+                <li>Click-to-slew from wide view</li>
+                <li>RTSP &rarr; MJPEG proxy</li>
+                <li>Health monitoring &amp; auto-reconnect</li>
+            </ul>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon">&#x1F3B5;</div>
+            <h3>Jazz Engine</h3>
+            <ul>
+                <li>Procedural + AI MusicRNN engines</li>
+                <li>Salamander Yamaha C5 grand piano</li>
+                <li>Telescope telemetry &rarr; music</li>
+                <li>12 keys &times; 9 scales</li>
+                <li>Web MIDI output to USB pianos</li>
+                <li>Audio recording for post-production</li>
+            </ul>
+        </div>
+    </div>
+</section>
+
+<!-- 3. Jazz Mapping -->
+<section id="jazz-mapping">
+    <h2>Telescope &rarr; Music</h2>
+    <table class="jazz-table">
+        <thead>
+            <tr>
+                <th>Telescope Data</th>
+                <th>Music Parameter</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr><td class="log-key">New stacked frame</td><td class="log-val">Melody note triggered</td></tr>
+            <tr><td class="log-key">RA (0&ndash;24h)</td><td class="log-val">Pitch / scale degree</td></tr>
+            <tr><td class="log-key">Dec (&minus;90&deg;&ndash;+90&deg;)</td><td class="log-val">Octave shift</td></tr>
+            <tr><td class="log-key">SNR</td><td class="log-val">Velocity (louder = cleaner signal)</td></tr>
+            <tr><td class="log-key">Dropped frame</td><td class="log-val">Dissonant grace note</td></tr>
+            <tr><td class="log-key">Star density</td><td class="log-val">Ghost note rate</td></tr>
+            <tr><td class="log-key">Dominant hue</td><td class="log-val">Key (color wheel &rarr; circle of fifths)</td></tr>
+            <tr><td class="log-key">Color diversity</td><td class="log-val">Scale complexity (pentatonic &rarr; diminished)</td></tr>
+            <tr><td class="log-key">Color diversity</td><td class="log-val">Octave range (monochrome &rarr; full piano)</td></tr>
+            <tr><td class="log-key">Telescope state</td><td class="log-val">Ensemble feel (working &rarr; full)</td></tr>
+            <tr><td class="log-key">Integration time</td><td class="log-val">Note duration (longer = longer sustain)</td></tr>
+        </tbody>
+    </table>
+    <p class="jazz-note"><span class="note-icon">&#9835;</span> 12 keys. 9 scales. Every note earned by photons.</p>
+</section>
+
+<!-- 4. Architecture -->
+<section id="architecture">
+    <h2>Architecture</h2>
+    <div class="arch-panel">
+        <pre>
+Seestar S30 Pro (Wi-Fi)
+  │
+  ├── TCP:4700 ──→ seestar_alp ──→ :5555 Alpaca REST API ──→ kiosk.html
+  │                               └→ :7556 MJPEG stream    ──→ &lt;img&gt; live view
+  │                               └→ :7556 SSE status      ──→ jazz engine feed()
+  │
+  └── RTSP:4555 ─→ wide_proxy.py ─→ :7557 MJPEG ──→ &lt;img&gt; wide PiP
+                                   └→ :7557/health ──→ connection monitor
+
+kiosk.html (:8888 local HTTP)
+  ├── Image analysis (canvas) ──→ star density, hue, entropy
+  │                              └→ jazz: key, scale, octave range, note density
+  ├── SSE telemetry ──→ jazz: RA→pitch, Dec→octave, SNR→velocity
+  ├── Jazz engine ──→ Web Audio (Salamander piano + pad + bass)
+  │               └→ Web MIDI (USB piano)
+  └── MediaRecorder ──→ .webm audio file (during video REC)
+        </pre>
+    </div>
+    <p class="arch-note">No cloud. No internet at runtime. 8.7 MB offline bundle.</p>
+</section>
+
+<!-- 5. Screenshot -->
+<section id="screenshot">
+    <h2>Screenshot</h2>
+    <div class="screenshot-placeholder">Screenshot coming soon</div>
+</section>
+
+<!-- 6. Quick Start -->
+<section id="quickstart">
+    <h2>Quick Start</h2>
+    <div class="steps">
+        <div class="step">
+            <span class="step-num">1</span>
+            <div class="step-text">Clone this repo<code>git clone https://github.com/kapoost/seestar-kiosk.git
+cd seestar-kiosk</code></div>
+        </div>
+        <div class="step">
+            <span class="step-num">2</span>
+            <div class="step-text">Clone the Alpaca proxy dependency<code>git clone https://github.com/smart-underworld/seestar_alp.git vendor/seestar_alp</code></div>
+        </div>
+        <div class="step">
+            <span class="step-num">3</span>
+            <div class="step-text">Set up Python environment<code>python3.11 -m venv .venv
+.venv/bin/pip install -r vendor/seestar_alp/requirements.txt
+.venv/bin/pip install flask flask-cors opencv-python-headless waitress</code></div>
+        </div>
+        <div class="step">
+            <span class="step-num">4</span>
+            <div class="step-text">Offline assets are included in <code>kiosk/lib/</code> &mdash; no internet needed at runtime</div>
+        </div>
+        <div class="step">
+            <span class="step-num">5</span>
+            <div class="step-text">Copy and edit config<code>cp config.sh.example config.sh</code></div>
+        </div>
+        <div class="step">
+            <span class="step-num">6</span>
+            <div class="step-text">Launch<code>./kiosk/launcher.sh</code></div>
+        </div>
+    </div>
+</section>
+
+<!-- 7. Footer -->
+<footer>
+    <p>MIT &mdash; <a href="https://github.com/kapoost/seestar-kiosk">kapoost</a></p>
+    <p class="credits">
+        <a href="https://github.com/smart-underworld/seestar_alp">seestar_alp</a> &middot;
+        <a href="https://magenta.tensorflow.org/">Magenta</a> &middot;
+        <a href="https://tonejs.github.io/">Tone.js</a> &middot;
+        <a href="https://sfzinstruments.github.io/pianos/salamander/">Salamander Grand Piano</a> &middot;
+        <a href="https://www.tensorflow.org/js">TensorFlow.js</a>
+    </p>
+</footer>
+
+<script src="stars.js"></script>
+</body>
+</html>
