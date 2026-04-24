@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# Seestar Kiosk — user configuration
+
+# Telescope IP. Leave empty for auto-discovery.
+SEESTAR_IP=""
+
+# seestar_alp ports
+ALPACA_PORT=5555
+IMG_PORT=7556
+UI_PORT=5480
+WIDE_PORT=7557
+
+# Seestar device number (default 1)
+DEVICE_NUM=1
+
+# PEM key for firmware 7.18+ authentication
+# Download from: https://discord.gg/B3zDCAMP4V (seestar_alp channel)
+INTEROP_PEM="$HOME/.seestar/interop.pem"
+
+# Python venv path
+VENV_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/.venv"
+
+# seestar_alp path
+SEESTAR_ALP_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/vendor/seestar_alp"

@@ -1,0 +1,23 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Logs
+logs/
+
+# Vendor (submodule or separate)
+vendor/
+
+# macOS
+.DS_Store
+
+# Chrome kiosk profile
+/tmp/seestar-kiosk-chrome/
+
+# Claude
+.claude/
+
+# Secrets
+*.pem
+config.sh

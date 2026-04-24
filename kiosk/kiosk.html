@@ -1,0 +1,1189 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Seestar Kiosk</title>
+    <link rel="stylesheet" href="kiosk.css">
+</head>
+<body>
+
+<!-- Live MJPEG stream from seestar_alp -->
+<div id="live-view">
+    <img id="live-img" alt="" crossorigin="anonymous">
+</div>
+<!-- Hidden canvas for image analysis -->
+<canvas id="analysis-canvas" style="display:none"></canvas>
+
+<!-- Jazz indicator -->
+<div id="jazz-badge">&#9835; JAZZ</div>
+
+<!-- Wide-angle PiP (top-right, toggle with W) -->
+<div id="wide-pip">
+    <img id="wide-img" alt="">
+    <div id="wide-crosshair"></div>
+    <span id="wide-label">WIDE</span>
+</div>
+
+<!-- Status overlay (bottom-right, dark red) -->
+<div id="overlay">
+    <div class="row">
+        <span class="label">Cel</span>
+        <span class="value" id="ov-target">&mdash;</span>
+    </div>
+    <div class="row">
+        <span class="label">Stacki</span>
+        <span class="value" id="ov-stacked">&mdash;</span>
+    </div>
+    <div class="row">
+        <span class="label">Ekspozycja</span>
+        <span class="value" id="ov-integration">&mdash;</span>
+    </div>
+    <div class="row">
+        <span class="label">Status</span>
+        <span class="value" id="ov-state">&mdash;</span>
+    </div>
+</div>
+
+<!-- Error screen -->
+<div id="error-screen">
+    <div class="message">Brak połączenia z teleskopem</div>
+    <div class="hint">Sprawdź czy seestar_alp działa na localhost</div>
+</div>
+
+<!-- Help panel (toggle with 'h') -->
+<div id="help-panel">
+    <div><kbd>Q</kbd> / <kbd>Esc</kbd> &mdash; zamknij kiosk</div>
+    <div><kbd>F</kbd> &mdash; pokaż / ukryj overlay</div>
+    <div><kbd>C</kbd> &mdash; crop / dopasuj obraz</div>
+    <div><kbd>W</kbd> &mdash; szerokokątny PiP</div>
+    <div><kbd>P</kbd> &mdash; panel sterowania</div>
+    <div><kbd>D</kbd> &mdash; day / night mode</div>
+    <div><kbd>J</kbd> &mdash; jazz on / off</div>
+    <div><kbd>H</kbd> &mdash; ten panel pomocy</div>
+</div>
+
+<!-- Control panel (slide from left, toggle with 'p') -->
+<div id="ctrl-panel">
+    <div id="ctrl-header">
+        <span class="ctrl-title">Sterowanie</span>
+        <button id="ctrl-close" title="Zamknij (P)">&times;</button>
+    </div>
+
+    <!-- Tabs -->
+    <div id="ctrl-tabs">
+        <button class="tab-btn active" data-tab="catalog">Katalog</button>
+        <button class="tab-btn" data-tab="pilot">Pilot</button>
+        <button class="tab-btn" data-tab="log">Log</button>
+    </div>
+
+    <!-- TAB: Catalog search -->
+    <div id="tab-catalog" class="tab-content active">
+    <div id="ctrl-search-box">
+        <input type="text" id="ctrl-search" placeholder="Szukaj obiekt (M31, Orion...)" autocomplete="off" spellcheck="false">
+        <div id="ctrl-filters">
+            <button class="filter-btn active" data-filter="all">Wszystko</button>
+            <button class="filter-btn" data-filter="gx">Galaktyki</button>
+            <button class="filter-btn" data-filter="nb">Mgławice</button>
+            <button class="filter-btn" data-filter="gc">Kule</button>
+            <button class="filter-btn" data-filter="oc">Otwarte</button>
+            <button class="filter-btn" data-filter="pn">Planetarne</button>
+            <button class="filter-btn" data-filter="snr">SNR</button>
+        </div>
+    </div>
+
+    <!-- Object list -->
+    <div id="ctrl-catalog"></div>
+
+    </div><!-- /tab-catalog -->
+
+    <!-- TAB: Pilot (manual control) -->
+    <div id="tab-pilot" class="tab-content">
+        <div class="pilot-section">
+            <label class="ctrl-label">Ruch manualny</label>
+            <div class="pilot-dpad">
+                <button class="pilot-btn" data-angle="0" data-pos="up" title="Góra">&#9650;</button>
+                <button class="pilot-btn" data-angle="270" data-pos="left" title="Lewo">&#9664;</button>
+                <button class="pilot-btn pilot-stop" data-pos="center" title="Stop">&#9632;</button>
+                <button class="pilot-btn" data-angle="90" data-pos="right" title="Prawo">&#9654;</button>
+                <button class="pilot-btn" data-angle="180" data-pos="down" title="Dół">&#9660;</button>
+            </div>
+            <label class="ctrl-label">Prędkość <span id="val-speed">2000</span></label>
+            <input type="range" id="sl-speed" min="500" max="8000" step="500" value="2000" class="ctrl-slider">
+            <label class="ctrl-label">Czas ruchu <span id="val-dur">3</span>s</label>
+            <input type="range" id="sl-dur" min="1" max="15" step="1" value="3" class="ctrl-slider">
+        </div>
+        <div class="pilot-section">
+            <label class="ctrl-label">Zoom (RTSP ROI)</label>
+            <div class="ctrl-row">
+                <button class="ctrl-btn" data-zoom="0">1x</button>
+                <button class="ctrl-btn" data-zoom="1">2x</button>
+                <button class="ctrl-btn" data-zoom="2">4x</button>
+            </div>
+        </div>
+        <div class="pilot-section">
+            <label class="ctrl-label">Tracking</label>
+            <div class="ctrl-row">
+                <button class="ctrl-btn" id="btn-track-on">Track ON</button>
+                <button class="ctrl-btn" id="btn-track-off">Track OFF</button>
+            </div>
+        </div>
+        <div class="pilot-section">
+            <label class="ctrl-label">Plate Solve</label>
+            <div class="ctrl-row">
+                <button class="ctrl-btn" id="btn-solve">Solve</button>
+                <button class="ctrl-btn" id="btn-solve-result">Wynik</button>
+            </div>
+        </div>
+    </div><!-- /tab-pilot -->
+
+    <!-- TAB: Log -->
+    <div id="tab-log" class="tab-content">
+        <div id="log-task" class="log-section">
+            <div class="log-heading">Zadanie</div>
+            <div id="log-task-content">
+                <div class="log-row"><span class="log-key">Cel</span><span class="log-val" id="log-target">—</span></div>
+                <div class="log-row"><span class="log-key">Tryb</span><span class="log-val" id="log-mode">—</span></div>
+                <div class="log-row"><span class="log-key">Etap</span><span class="log-val" id="log-stage">—</span></div>
+                <div class="log-row"><span class="log-key">Stan</span><span class="log-val" id="log-state">—</span></div>
+                <div class="log-row"><span class="log-key">Stacki</span><span class="log-val" id="log-stacked">—</span></div>
+                <div class="log-row"><span class="log-key">Odrzucone</span><span class="log-val" id="log-dropped">—</span></div>
+                <div class="log-row"><span class="log-key">Ekspozycja</span><span class="log-val" id="log-integration">—</span></div>
+                <div class="log-row"><span class="log-key">Czas</span><span class="log-val" id="log-elapsed">—</span></div>
+                <div class="log-row"><span class="log-key">SNR</span><span class="log-val" id="log-snr">—</span></div>
+                <div class="log-row"><span class="log-key">RA</span><span class="log-val" id="log-ra">—</span></div>
+                <div class="log-row"><span class="log-key">Dec</span><span class="log-val" id="log-dec">—</span></div>
+            </div>
+        </div>
+        <div class="log-heading">Zdarzenia</div>
+        <div id="log-events"></div>
+    </div><!-- /tab-log -->
+
+    <!-- Toast for GoTo feedback -->
+    <div id="ctrl-toast"></div>
+
+    <!-- Controls -->
+    <div id="ctrl-controls">
+        <div class="ctrl-section">
+            <label class="ctrl-label">Tryb</label>
+            <div class="ctrl-row mode-row">
+                <button class="ctrl-btn mode-btn active" data-mode="stack">Noc (Stack)</button>
+                <button class="ctrl-btn mode-btn" data-mode="photo">Dzień (Foto)</button>
+                <button class="ctrl-btn mode-btn" data-mode="video">Video</button>
+            </div>
+        </div>
+        <div class="ctrl-section" id="sec-stack">
+            <div class="ctrl-row">
+                <button id="btn-stack" class="ctrl-btn big">Start Stack</button>
+                <button id="btn-stop" class="ctrl-btn big danger">Stop</button>
+            </div>
+        </div>
+        <div class="ctrl-section hidden" id="sec-photo">
+            <div class="ctrl-row">
+                <button id="btn-scenery" class="ctrl-btn big">Scenery View</button>
+                <button id="btn-stop-photo" class="ctrl-btn big danger">Stop</button>
+            </div>
+        </div>
+        <div class="ctrl-section hidden" id="sec-video">
+            <div class="ctrl-row">
+                <button id="btn-rec" class="ctrl-btn big rec-btn">REC</button>
+                <button id="btn-rec-stop" class="ctrl-btn big danger">Stop REC</button>
+            </div>
+            <label class="ctrl-label" style="margin-top:6px">Timelapse <span id="val-timelapse">0</span>s (0 = wyłączony)</label>
+            <input type="range" id="sl-timelapse" min="0" max="60" step="1" value="0" class="ctrl-slider">
+        </div>
+        <div class="ctrl-section">
+            <label class="ctrl-label">Ekspozycja <span id="val-exp">10</span>s</label>
+            <input type="range" id="sl-exp" min="10" max="120" step="10" value="10" class="ctrl-slider">
+        </div>
+        <div class="ctrl-section">
+            <label class="ctrl-label">Gain <span id="val-gain">80</span></label>
+            <input type="range" id="sl-gain" min="0" max="300" step="10" value="80" class="ctrl-slider">
+        </div>
+        <div class="ctrl-section">
+            <label class="ctrl-label">Focus</label>
+            <div class="ctrl-row">
+                <button class="ctrl-btn" id="btn-focus-out">&#9664;&#9664; -50</button>
+                <button class="ctrl-btn" id="btn-focus-out-sm">&#9664; -10</button>
+                <button class="ctrl-btn" id="btn-af">AF</button>
+                <button class="ctrl-btn" id="btn-focus-in-sm">&#9654; +10</button>
+                <button class="ctrl-btn" id="btn-focus-in">&#9654;&#9654; +50</button>
+            </div>
+        </div>
+        <div class="ctrl-section">
+            <div class="ctrl-row">
+                <button id="btn-open" class="ctrl-btn">Open Arm</button>
+                <button id="btn-park" class="ctrl-btn">Close Arm</button>
+                <button id="btn-abort" class="ctrl-btn danger">Abort</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Jazz panel (slide from right, opens with P together with left panel) -->
+<div id="jazz-panel">
+    <div class="jazz-header">
+        <span class="ctrl-title">&#9835; Muzyka</span>
+    </div>
+    <div class="jazz-body">
+        <div class="jazz-sect">
+            <label class="ctrl-label">Jazz <span id="jazz-status">OFF</span></label>
+            <div class="ctrl-row">
+                <button class="ctrl-btn" id="btn-jazz-toggle">Jazz ON/OFF</button>
+            </div>
+        </div>
+        <div class="jazz-sect">
+            <label class="ctrl-label">Tonacja</label>
+            <div class="ctrl-row">
+                <select id="sel-jazz-key" class="ctrl-select">
+                    <option value="0">C</option><option value="1">C#</option>
+                    <option value="2">D</option><option value="3">D#</option>
+                    <option value="4">E</option><option value="5">F</option>
+                    <option value="6">F#</option><option value="7">G</option>
+                    <option value="8">G#</option><option value="9">A</option>
+                    <option value="10">A#</option><option value="11">B</option>
+                </select>
+                <select id="sel-jazz-scale" class="ctrl-select">
+                    <option value="dorian">Dorian</option>
+                    <option value="mixolydian">Mixolydian</option>
+                    <option value="blues">Blues</option>
+                    <option value="minor">Minor nat.</option>
+                    <option value="major">Major</option>
+                    <option value="pentatonic">Pentatonic</option>
+                    <option value="minpent">Min. pent.</option>
+                    <option value="wholetone">Whole tone</option>
+                    <option value="diminished">Diminished</option>
+                </select>
+            </div>
+        </div>
+        <div class="jazz-sect">
+            <label class="ctrl-label">Głośność synth <span id="val-jazz-vol">50</span>%</label>
+            <input type="range" id="sl-jazz-vol" min="0" max="100" step="5" value="50" class="ctrl-slider">
+        </div>
+        <div class="jazz-sect">
+            <label class="ctrl-label">Reverb <span id="val-jazz-reverb">35</span>%</label>
+            <input type="range" id="sl-jazz-reverb" min="0" max="100" step="5" value="35" class="ctrl-slider">
+        </div>
+        <div class="jazz-sect">
+            <label class="ctrl-label-inline"><input type="checkbox" id="chk-auto-tonality" checked> Auto-tonacja z obrazu</label>
+        </div>
+        <div class="jazz-sect">
+            <label class="ctrl-label">Wyjście</label>
+            <div class="ctrl-row">
+                <label class="ctrl-label-inline"><input type="checkbox" id="chk-synth" checked> Synth</label>
+                <label class="ctrl-label-inline"><input type="checkbox" id="chk-midi"> MIDI Out</label>
+            </div>
+        </div>
+        <div class="jazz-sect">
+            <label class="ctrl-label">MIDI urządzenie</label>
+            <select id="sel-midi-device" class="ctrl-select ctrl-select-full">
+                <option value="">— brak —</option>
+            </select>
+            <button class="ctrl-btn" id="btn-midi-refresh" style="margin-top:4px;font-size:10px">Odśwież MIDI</button>
+        </div>
+        <div class="jazz-sect">
+            <label class="ctrl-label">MIDI kanał <span id="val-midi-ch">1</span></label>
+            <input type="range" id="sl-midi-ch" min="1" max="16" step="1" value="1" class="ctrl-slider">
+        </div>
+    </div>
+</div>
+
+<script src="catalog.js"></script>
+<script src="jazz.js"></script>
+<script>
+(function() {
+    "use strict";
+
+    // --- Configuration ---
+    const params = new URLSearchParams(window.location.search);
+    const HOST = params.get("host") || "localhost";
+    const IMG_PORT = params.get("imgport") || "7556";
+    const DEV_NUM = params.get("devnum") || "1";
+    const ALPACA_PORT = params.get("alpacaport") || "5555";
+    const WIDE_PORT = params.get("wideport") || "7557";
+
+    const STREAM_URL = `http://${HOST}:${IMG_PORT}/${DEV_NUM}/vid`;
+    const STATUS_SSE_URL = `http://${HOST}:${IMG_PORT}/${DEV_NUM}/live/status`;
+    const ALPACA_URL = `http://${HOST}:${ALPACA_PORT}/api/v1/telescope/${DEV_NUM}`;
+    const WIDE_URL = `http://${HOST}:${WIDE_PORT}/vid`;
+
+    // --- DOM refs ---
+    const liveImg = document.getElementById("live-img");
+    const overlay = document.getElementById("overlay");
+    const errorScreen = document.getElementById("error-screen");
+    const helpPanel = document.getElementById("help-panel");
+    const ctrlPanel = document.getElementById("ctrl-panel");
+    const ovTarget = document.getElementById("ov-target");
+    const ovStacked = document.getElementById("ov-stacked");
+    const ovIntegration = document.getElementById("ov-integration");
+    const ovState = document.getElementById("ov-state");
+
+    const wideImg = document.getElementById("wide-img");
+    const widePip = document.getElementById("wide-pip");
+    const jazzPanel = document.getElementById("jazz-panel");
+
+    let overlayVisible = true;
+    let wideVisible = false;
+    let ctrlVisible = false;
+    let helpTimeout = null;
+    let sseRetryTimeout = null;
+    let streamAlive = false;
+    let lastSseState = "";
+    let streamReloadTimer = null;
+
+    function reloadWideStream() {
+        if (wideVisible) {
+            wideImg.src = WIDE_URL + "?t=" + Date.now();
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // ALPACA API helpers
+    // ═══════════════════════════════════════════════════════════════
+
+    function raToHMS(h) {
+        var hrs = Math.floor(h);
+        var m = Math.floor((h - hrs) * 60);
+        var s = ((h - hrs) * 60 - m) * 60;
+        return hrs + ":" + m + ":" + s.toFixed(1);
+    }
+
+    function decToDMS(d) {
+        var sign = d >= 0 ? "+" : "-";
+        var abs = Math.abs(d);
+        var deg = Math.floor(abs);
+        var m = Math.floor((abs - deg) * 60);
+        var s = ((abs - deg) * 60 - m) * 60;
+        return sign + deg + ":" + m + ":" + s.toFixed(1);
+    }
+
+    function alpacaAction(action, parameters) {
+        var body = new URLSearchParams();
+        body.append("Action", action);
+        body.append("Parameters", JSON.stringify(parameters));
+        body.append("ClientID", "1");
+        body.append("ClientTransactionID", String(Date.now() % 100000));
+        return fetch(ALPACA_URL + "/action", {method: "PUT", body: body})
+            .then(function(r) { return r.json(); })
+            .catch(function(e) { return {ErrorNumber: -1, ErrorMessage: e.message}; });
+    }
+
+    function alpacaPut(endpoint, params) {
+        var body = new URLSearchParams();
+        if (params) Object.keys(params).forEach(function(k) { body.append(k, params[k]); });
+        body.append("ClientID", "1");
+        body.append("ClientTransactionID", String(Date.now() % 100000));
+        return fetch(ALPACA_URL + "/" + endpoint, {method: "PUT", body: body})
+            .then(function(r) { return r.json(); })
+            .catch(function(e) { return {ErrorNumber: -1, ErrorMessage: e.message}; });
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // Toast notifications
+    // ═══════════════════════════════════════════════════════════════
+
+    var toastEl = document.getElementById("ctrl-toast");
+    var toastTimer = null;
+
+    function showToast(msg, isError) {
+        toastEl.textContent = msg;
+        toastEl.className = isError ? "visible error" : "visible";
+        if (toastTimer) clearTimeout(toastTimer);
+        toastTimer = setTimeout(function() { toastEl.className = ""; }, 3000);
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // Control panel — catalog
+    // ═══════════════════════════════════════════════════════════════
+
+    var catalogEl = document.getElementById("ctrl-catalog");
+    var searchEl = document.getElementById("ctrl-search");
+    var activeFilter = "all";
+
+    var TYPE_LABELS = {
+        gx: "Galaktyka", nb: "Mgławica", pn: "Planetarna",
+        oc: "Gromada otw.", gc: "Gromada kul.", snr: "SNR", other: ""
+    };
+
+    function renderCatalog() {
+        var q = searchEl.value.toLowerCase().trim();
+        var html = "";
+        var count = 0;
+        for (var i = 0; i < CATALOG.length && count < 80; i++) {
+            var obj = CATALOG[i];
+            if (activeFilter !== "all" && obj.t !== activeFilter) continue;
+            var label = obj.id + (obj.n ? " " + obj.n : "");
+            if (q && label.toLowerCase().indexOf(q) === -1) continue;
+            html += '<div class="cat-item" data-idx="' + i + '">' +
+                '<span class="cat-id">' + obj.id + '</span>' +
+                '<span class="cat-name">' + (obj.n || TYPE_LABELS[obj.t] || "") + '</span>' +
+                '</div>';
+            count++;
+        }
+        if (!count) html = '<div class="cat-empty">Brak wyników</div>';
+        catalogEl.innerHTML = html;
+    }
+
+    searchEl.addEventListener("input", renderCatalog);
+
+    // Filter buttons
+    document.getElementById("ctrl-filters").addEventListener("click", function(e) {
+        var btn = e.target.closest(".filter-btn");
+        if (!btn) return;
+        document.querySelectorAll(".filter-btn").forEach(function(b) { b.classList.remove("active"); });
+        btn.classList.add("active");
+        activeFilter = btn.dataset.filter;
+        renderCatalog();
+    });
+
+    // Click on catalog item → GoTo
+    // Send iscope_start_view directly via method_sync to bypass is_goto() lock
+    catalogEl.addEventListener("click", function(e) {
+        var item = e.target.closest(".cat-item");
+        if (!item) return;
+        var obj = CATALOG[parseInt(item.dataset.idx)];
+        var label = obj.id + (obj.n ? " " + obj.n : "");
+        showToast("GoTo " + label + "...");
+        item.classList.add("slewing");
+
+        // Stop current view first, then start new one
+        alpacaAction("method_sync", {method: "iscope_stop_view", params: {}})
+        .then(function() {
+            return new Promise(function(r) { setTimeout(r, 1000); });
+        })
+        .then(function() {
+            // Send iscope_start_view directly — same as goto_target but
+            // bypasses the is_goto() state check that gets stuck
+            return alpacaAction("method_sync", {
+                method: "iscope_start_view",
+                params: {
+                    mode: "star",
+                    target_ra_dec: [obj.ra, obj.dec],
+                    target_name: label,
+                    lp_filter: false
+                }
+            });
+        })
+        .then(function(r) {
+            var val = r.Value || r;
+            if (val && val.error) {
+                showToast("Błąd: " + JSON.stringify(val.error), true);
+            } else {
+                showToast("Slew do " + obj.id);
+                setTimeout(reloadWideStream, 3000);
+            }
+            item.classList.remove("slewing");
+        })
+        .catch(function(err) {
+            showToast("Błąd: " + err.message, true);
+            item.classList.remove("slewing");
+        });
+    });
+
+    // ═══════════════════════════════════════════════════════════════
+    // Control panel — buttons
+    // ═══════════════════════════════════════════════════════════════
+
+    // ═══════════════════════════════════════════════════════════════
+    // Mode switcher (Stack / Photo / Video)
+    // ═══════════════════════════════════════════════════════════════
+
+    var currentMode = "stack";
+    document.querySelector(".mode-row").addEventListener("click", function(e) {
+        var btn = e.target.closest(".mode-btn");
+        if (!btn) return;
+        currentMode = btn.dataset.mode;
+        document.querySelectorAll(".mode-btn").forEach(function(b) { b.classList.remove("active"); });
+        btn.classList.add("active");
+        document.getElementById("sec-stack").classList.toggle("hidden", currentMode !== "stack");
+        document.getElementById("sec-photo").classList.toggle("hidden", currentMode !== "photo");
+        document.getElementById("sec-video").classList.toggle("hidden", currentMode !== "video");
+    });
+
+    // --- Stack (night) ---
+    document.getElementById("btn-stack").addEventListener("click", function() {
+        showToast("Start stacking...");
+        alpacaAction("method_sync", {method: "iscope_start_stack", params: {restart: false}})
+            .then(function(r) {
+                if (r.ErrorNumber && r.ErrorNumber !== 0) showToast("Błąd: " + r.ErrorMessage, true);
+                else showToast("Stacking started");
+            });
+    });
+
+    document.getElementById("btn-stop").addEventListener("click", function() {
+        showToast("Stopping...");
+        alpacaAction("method_sync", {method: "iscope_stop_view", params: {}})
+            .then(function(r) {
+                if (r.ErrorNumber && r.ErrorNumber !== 0) showToast("Błąd: " + r.ErrorMessage, true);
+                else showToast("Stopped");
+            });
+    });
+
+    // --- Photo / Scenery (day) ---
+    document.getElementById("btn-scenery").addEventListener("click", function() {
+        showToast("Scenery view...");
+        alpacaAction("method_sync", {
+            method: "iscope_start_view",
+            params: {mode: "scenery"}
+        }).then(function(r) {
+            if (r.ErrorNumber && r.ErrorNumber !== 0) showToast("Błąd: " + r.ErrorMessage, true);
+            else showToast("Scenery mode active");
+        });
+    });
+
+    document.getElementById("btn-stop-photo").addEventListener("click", function() {
+        showToast("Stopping...");
+        alpacaAction("method_sync", {method: "iscope_stop_view", params: {}})
+            .then(function(r) {
+                if (r.ErrorNumber && r.ErrorNumber !== 0) showToast("Błąd: " + r.ErrorMessage, true);
+                else showToast("Stopped");
+            });
+    });
+
+    // --- Video recording ---
+    var slTimelapse = document.getElementById("sl-timelapse");
+    var valTimelapse = document.getElementById("val-timelapse");
+    slTimelapse.addEventListener("input", function() { valTimelapse.textContent = slTimelapse.value; });
+
+    document.getElementById("btn-rec").addEventListener("click", function() {
+        var tl = parseInt(slTimelapse.value);
+        var params = {raw: false};
+        if (tl > 0) params.timelapse = {enable: true, delay_sec: tl};
+        showToast("REC start" + (tl > 0 ? " (timelapse " + tl + "s)" : "") + "...");
+        alpacaAction("method_sync", {method: "start_record_avi", params: params})
+            .then(function(r) {
+                var val = r.Value || r;
+                if (val && val.error) showToast("Błąd: " + JSON.stringify(val.error), true);
+                else showToast("Nagrywanie...");
+            });
+    });
+
+    document.getElementById("btn-rec-stop").addEventListener("click", function() {
+        showToast("Stop REC...");
+        alpacaAction("method_sync", {method: "stop_record_avi", params: {}})
+            .then(function(r) {
+                var val = r.Value || r;
+                if (val && val.error) showToast("Błąd: " + JSON.stringify(val.error), true);
+                else showToast("Nagrywanie zatrzymane");
+            });
+    });
+
+    document.getElementById("btn-open").addEventListener("click", function() {
+        showToast("Opening arm...");
+        alpacaAction("action_start_up_sequence", {})
+            .then(function(r) {
+                var val = r.Value || r;
+                if (val && val.code && val.code !== 0) showToast("Błąd: " + (val.error || val.msg), true);
+                else showToast("Arm opening");
+            });
+    });
+
+    document.getElementById("btn-park").addEventListener("click", function() {
+        showToast("Closing arm (park)...");
+        alpacaAction("method_sync", {method: "scope_park", params: {}})
+            .then(function(r) {
+                showToast("Arm closing (park)");
+            });
+    });
+
+    document.getElementById("btn-abort").addEventListener("click", function() {
+        alpacaPut("abortslew", {}).then(function() { showToast("Slew aborted"); });
+    });
+
+    // Focus
+    function moveFocus(steps) {
+        showToast("Focus " + (steps > 0 ? "+" : "") + steps);
+        alpacaAction("method_sync", {method: "move_focuser", params: {step: steps, ret_step: true}});
+    }
+
+    document.getElementById("btn-focus-out").addEventListener("click", function() { moveFocus(-50); });
+    document.getElementById("btn-focus-out-sm").addEventListener("click", function() { moveFocus(-10); });
+    document.getElementById("btn-focus-in-sm").addEventListener("click", function() { moveFocus(10); });
+    document.getElementById("btn-focus-in").addEventListener("click", function() { moveFocus(50); });
+    document.getElementById("btn-af").addEventListener("click", function() {
+        showToast("Auto-focus...");
+        alpacaAction("method_sync", {method: "start_auto_focuse", params: {}});
+    });
+
+    // Exposure slider
+    var slExp = document.getElementById("sl-exp");
+    var valExp = document.getElementById("val-exp");
+    slExp.addEventListener("input", function() { valExp.textContent = slExp.value; });
+    slExp.addEventListener("change", function() {
+        showToast("Exp: " + slExp.value + "s");
+        alpacaAction("method_sync", {method: "set_stack_setting", params: {exp_ms: parseInt(slExp.value) * 1000}});
+    });
+
+    // Gain slider
+    var slGain = document.getElementById("sl-gain");
+    var valGain = document.getElementById("val-gain");
+    slGain.addEventListener("input", function() { valGain.textContent = slGain.value; });
+    slGain.addEventListener("change", function() {
+        showToast("Gain: " + slGain.value);
+        alpacaAction("method_sync", {method: "set_setting", params: {stack: {gain: parseInt(slGain.value)}}});
+    });
+
+    // ═══════════════════════════════════════════════════════════════
+    // Log — live task info + event feed
+    // ═══════════════════════════════════════════════════════════════
+
+    var logEventsEl = document.getElementById("log-events");
+    var logLines = [];
+    var MAX_LOG_LINES = 80;
+
+    function addLogLine(text) {
+        var now = new Date();
+        var ts = String(now.getHours()).padStart(2,"0") + ":" +
+                 String(now.getMinutes()).padStart(2,"0") + ":" +
+                 String(now.getSeconds()).padStart(2,"0");
+        logLines.push(ts + " " + text);
+        if (logLines.length > MAX_LOG_LINES) logLines.shift();
+        logEventsEl.innerHTML = logLines.map(function(l) {
+            return '<div class="log-line">' + l + '</div>';
+        }).join("");
+        logEventsEl.scrollTop = logEventsEl.scrollHeight;
+    }
+
+    // Hook into toast to also log
+    var _origShowToast = showToast;
+    showToast = function(msg, isError) {
+        _origShowToast(msg, isError);
+        addLogLine((isError ? "[ERR] " : "") + msg);
+    };
+
+    // SSE event stream for device events (port 7556)
+    var evtEvents = null;
+    function connectEventSSE() {
+        var url = "http://" + HOST + ":" + IMG_PORT + "/" + DEV_NUM + "/events";
+        evtEvents = new EventSource(url);
+        evtEvents.addEventListener("message", function(e) {
+            try {
+                var d = JSON.parse(e.data);
+                if (d.Event === "PiStatus") return; // skip noisy temp events
+                addLogLine(d.Event + ": " + (d.state || "") + (d.mode ? " [" + d.mode + "]" : ""));
+            } catch(err) {}
+        });
+        evtEvents.addEventListener("error", function() {
+            // auto-reconnect
+        });
+    }
+
+    // Update log task panel from SSE statusUpdate events
+    function updateLogTask(data) {
+        var el = function(id) { return document.getElementById(id); };
+        if (data.target_name != null) el("log-target").textContent = data.target_name || "—";
+        if (data.mode != null) el("log-mode").textContent = data.mode || "—";
+        if (data.stage != null) el("log-stage").textContent = data.stage || "—";
+        if (data.state != null) el("log-state").textContent = data.state || "—";
+        if (data.stats) {
+            el("log-stacked").textContent = data.stats.stacked_frame != null ? data.stats.stacked_frame : "—";
+            el("log-dropped").textContent = data.stats.dropped_frame != null ? data.stats.dropped_frame : "—";
+            el("log-integration").textContent = data.stats.integration_time || "—";
+            el("log-elapsed").textContent = data.stats.elapsed || "—";
+        }
+        if (data.snr != null) el("log-snr").textContent = typeof data.snr === "number" ? data.snr.toFixed(1) : "—";
+        if (data.ra != null) el("log-ra").textContent = typeof data.ra === "number" ? data.ra.toFixed(5) : "—";
+        if (data.dec != null) el("log-dec").textContent = typeof data.dec === "number" ? data.dec.toFixed(5) : "—";
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // Tabs
+    // ═══════════════════════════════════════════════════════════════
+
+    document.getElementById("ctrl-tabs").addEventListener("click", function(e) {
+        var btn = e.target.closest(".tab-btn");
+        if (!btn) return;
+        document.querySelectorAll(".tab-btn").forEach(function(b) { b.classList.remove("active"); });
+        document.querySelectorAll(".tab-content").forEach(function(t) { t.classList.remove("active"); });
+        btn.classList.add("active");
+        document.getElementById("tab-" + btn.dataset.tab).classList.add("active");
+    });
+
+    // ═══════════════════════════════════════════════════════════════
+    // Pilot — manual movement (D-pad)
+    // ═══════════════════════════════════════════════════════════════
+
+    var slSpeed = document.getElementById("sl-speed");
+    var valSpeed = document.getElementById("val-speed");
+    var slDur = document.getElementById("sl-dur");
+    var valDur = document.getElementById("val-dur");
+
+    slSpeed.addEventListener("input", function() { valSpeed.textContent = slSpeed.value; });
+    slDur.addEventListener("input", function() { valDur.textContent = slDur.value; });
+
+    document.querySelector(".pilot-dpad").addEventListener("click", function(e) {
+        var btn = e.target.closest(".pilot-btn");
+        if (!btn) return;
+        if (btn.classList.contains("pilot-stop")) {
+            showToast("Stop");
+            alpacaPut("abortslew", {});
+            return;
+        }
+        var angle = parseInt(btn.dataset.angle);
+        var speed = parseInt(slSpeed.value);
+        var dur = parseInt(slDur.value);
+        showToast("Move " + angle + "° spd=" + speed);
+        alpacaAction("method_sync", {
+            method: "scope_speed_move",
+            params: {speed: speed, angle: angle, dur_sec: dur}
+        }).then(function() {
+            // Reload wide stream after movement completes
+            setTimeout(reloadWideStream, (dur + 1) * 1000);
+        });
+    });
+
+    // Zoom buttons
+    document.querySelectorAll("[data-zoom]").forEach(function(btn) {
+        btn.addEventListener("click", function() {
+            var z = parseInt(btn.dataset.zoom);
+            showToast("Zoom " + ["1x","2x","4x"][z]);
+            alpacaAction("method_sync", {
+                method: "set_setting",
+                params: {rtsp_roi_index: z}
+            });
+        });
+    });
+
+    // Tracking
+    document.getElementById("btn-track-on").addEventListener("click", function() {
+        showToast("Tracking ON");
+        alpacaPut("tracking", {Tracking: "true"});
+    });
+
+    document.getElementById("btn-track-off").addEventListener("click", function() {
+        showToast("Tracking OFF");
+        alpacaPut("tracking", {Tracking: "false"});
+    });
+
+    // Plate solve
+    document.getElementById("btn-solve").addEventListener("click", function() {
+        showToast("Plate solving...");
+        alpacaAction("method_sync", {method: "start_solve", params: {}});
+    });
+
+    document.getElementById("btn-solve-result").addEventListener("click", function() {
+        alpacaAction("method_sync", {method: "get_solve_result", params: {}})
+            .then(function(r) {
+                var val = r.Value || r;
+                if (val && val.result) {
+                    var res = val.result;
+                    showToast("RA:" + (res.ra_dec ? res.ra_dec[0].toFixed(4) + " Dec:" + res.ra_dec[1].toFixed(4) : JSON.stringify(res)));
+                } else {
+                    showToast("Brak wyniku solve", true);
+                }
+            });
+    });
+
+    // ═══════════════════════════════════════════════════════════════
+    // Panel toggle
+    // ═══════════════════════════════════════════════════════════════
+
+    function togglePanel() {
+        ctrlVisible = !ctrlVisible;
+        ctrlPanel.classList.toggle("open", ctrlVisible);
+        jazzPanel.classList.toggle("open", ctrlVisible);
+        if (ctrlVisible) {
+            document.body.style.cursor = "auto";
+            renderCatalog();
+        } else {
+            document.body.style.cursor = "none";
+        }
+    }
+
+    document.getElementById("ctrl-close").addEventListener("click", togglePanel);
+
+    // ═══════════════════════════════════════════════════════════════
+    // Live MJPEG stream
+    // ═══════════════════════════════════════════════════════════════
+
+    function startStream() {
+        streamAlive = false;
+        liveImg.src = STREAM_URL + "?t=" + Date.now();
+        errorScreen.classList.remove("visible");
+    }
+
+    liveImg.addEventListener("load", function() { streamAlive = true; });
+    liveImg.addEventListener("error", function() {
+        streamAlive = false;
+        errorScreen.classList.add("visible");
+        setTimeout(startStream, 5000);
+    });
+
+    function scheduleStreamReload() {
+        if (streamReloadTimer) return;
+        streamReloadTimer = setInterval(function() {
+            if (lastSseState === "working") {
+                startStream();
+            } else {
+                clearInterval(streamReloadTimer);
+                streamReloadTimer = null;
+            }
+        }, 3000);
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // SSE status feed
+    // ═══════════════════════════════════════════════════════════════
+
+    var evtSource = null;
+
+    function connectSSE() {
+        if (evtSource) evtSource.close();
+        evtSource = new EventSource(STATUS_SSE_URL);
+
+        evtSource.addEventListener("statusUpdate", function(e) {
+            try {
+                var d = JSON.parse(e.data);
+                updateLogTask(d);
+                SeestarJazz.feed(d);
+            } catch(err) {}
+        });
+
+        evtSource.addEventListener("message", function(e) {
+            try {
+                var parser = new DOMParser();
+                var doc = parser.parseFromString(e.data, "text/html");
+                var rows = doc.querySelectorAll(".row");
+
+                var target = null, state = null, stacked = null, integration = null;
+                rows.forEach(function(row) {
+                    var label = row.querySelector(".fw-bold");
+                    var value = row.querySelector(".col:last-child");
+                    if (!label || !value) return;
+                    var key = label.textContent.trim();
+                    var val = value.textContent.trim();
+                    switch (key) {
+                        case "Target Name": target = val; break;
+                        case "State": state = val; break;
+                        case "Stacked Frames": stacked = val; break;
+                        case "Integration Time": integration = val; break;
+                    }
+                });
+
+                if (target !== null) { ovTarget.textContent = target; document.getElementById("log-target").textContent = target || "—"; }
+                if (state !== null) { ovState.textContent = state; document.getElementById("log-state").textContent = state || "—"; }
+                if (stacked !== null) { ovStacked.textContent = stacked; document.getElementById("log-stacked").textContent = stacked || "—"; }
+                if (integration !== null) { ovIntegration.textContent = integration; document.getElementById("log-integration").textContent = integration || "—"; }
+
+                SeestarJazz.feedOverlay(state, stacked);
+
+                if (state !== null) {
+                    var wasWorking = lastSseState === "working";
+                    lastSseState = state;
+                    if (state === "working" && !wasWorking) {
+                        startStream();
+                        scheduleStreamReload();
+                    } else if (state === "working" && !streamReloadTimer) {
+                        scheduleStreamReload();
+                    }
+                    if (state !== "working" && streamReloadTimer) {
+                        clearInterval(streamReloadTimer);
+                        streamReloadTimer = null;
+                    }
+                }
+
+                errorScreen.classList.remove("visible");
+            } catch (err) {}
+        });
+
+        evtSource.addEventListener("error", function() {
+            if (sseRetryTimeout) clearTimeout(sseRetryTimeout);
+            sseRetryTimeout = setTimeout(function() {
+                ovState.textContent = "rozłączony";
+            }, 10000);
+        });
+
+        evtSource.addEventListener("open", function() {
+            if (sseRetryTimeout) { clearTimeout(sseRetryTimeout); sseRetryTimeout = null; }
+        });
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // Keyboard controls
+    // ═══════════════════════════════════════════════════════════════
+
+    document.addEventListener("keydown", function(e) {
+        // Ignore keyboard shortcuts when in form controls
+        if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT") {
+            if (e.key === "Escape") { e.target.blur(); e.preventDefault(); }
+            return;
+        }
+        switch (e.key) {
+            case "q": case "Q": case "Escape":
+                if (ctrlVisible) { togglePanel(); }
+                else {
+                    window.close();
+                    document.body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100vh;color:#5a0000;font-size:20px;font-family:monospace">Zamknij tę kartę ręcznie (Cmd+W)</div>';
+                }
+                break;
+            case "f": case "F":
+                overlayVisible = !overlayVisible;
+                overlay.classList.toggle("hidden", !overlayVisible);
+                break;
+            case "c": case "C":
+                liveImg.classList.toggle("cropped");
+                break;
+            case "w": case "W":
+                wideVisible = !wideVisible;
+                widePip.classList.toggle("visible", wideVisible);
+                if (wideVisible && !wideImg.src) {
+                    wideImg.src = WIDE_URL + "?t=" + Date.now();
+                }
+                break;
+            case "d": case "D":
+                document.body.classList.toggle("day-mode");
+                break;
+            case "j": case "J":
+                toggleJazz();
+                break;
+            case "p": case "P":
+                togglePanel();
+                break;
+            case "h": case "H":
+                helpPanel.classList.add("visible");
+                if (helpTimeout) clearTimeout(helpTimeout);
+                helpTimeout = setTimeout(function() { helpPanel.classList.remove("visible"); }, 4000);
+                break;
+        }
+    });
+
+    // ═══════════════════════════════════════════════════════════════
+    // Jazz engine controls
+    // ═══════════════════════════════════════════════════════════════
+
+    var jazzStatusEl = document.getElementById("jazz-status");
+    var jazzBadge = document.getElementById("jazz-badge");
+
+    function toggleJazz() {
+        var on = SeestarJazz.toggle();
+        jazzStatusEl.textContent = on ? "ON" : "OFF";
+        jazzBadge.classList.toggle("visible", on);
+        showToast(on ? "Jazz ON" : "Jazz OFF");
+    }
+
+    document.getElementById("btn-jazz-toggle").addEventListener("click", toggleJazz);
+
+    // Volume
+    var slJazzVol = document.getElementById("sl-jazz-vol");
+    var valJazzVol = document.getElementById("val-jazz-vol");
+    slJazzVol.addEventListener("input", function() {
+        valJazzVol.textContent = slJazzVol.value;
+        SeestarJazz.setVolume(parseInt(slJazzVol.value) / 100);
+    });
+
+    // Reverb
+    var slReverb = document.getElementById("sl-jazz-reverb");
+    var valReverb = document.getElementById("val-jazz-reverb");
+    slReverb.addEventListener("input", function() {
+        valReverb.textContent = slReverb.value;
+        SeestarJazz.setReverb(parseInt(slReverb.value) / 100);
+    });
+
+    // Auto-tonality
+    var chkAutoTonality = document.getElementById("chk-auto-tonality");
+    chkAutoTonality.addEventListener("change", function() {
+        SeestarJazz.setAutoTonality(this.checked);
+        showToast(this.checked ? "Auto-tonacja ON" : "Auto-tonacja OFF (manual)");
+    });
+
+    // Key selector (manual override disables auto)
+    var selJazzKey = document.getElementById("sel-jazz-key");
+    selJazzKey.addEventListener("change", function() {
+        SeestarJazz.setAutoTonality(false);
+        chkAutoTonality.checked = false;
+        SeestarJazz.setKey(parseInt(this.value));
+        showToast("Tonacja: " + SeestarJazz.getKeyName() + " " + SeestarJazz.getScaleDisplayName());
+    });
+
+    // Scale selector (manual override disables auto)
+    var selJazzScale = document.getElementById("sel-jazz-scale");
+    selJazzScale.addEventListener("change", function() {
+        SeestarJazz.setAutoTonality(false);
+        chkAutoTonality.checked = false;
+        SeestarJazz.setScale(this.value);
+        showToast("Skala: " + SeestarJazz.getKeyName() + " " + SeestarJazz.getScaleDisplayName());
+    });
+
+    // Synth / MIDI checkboxes
+    document.getElementById("chk-synth").addEventListener("change", function() {
+        SeestarJazz.setSynthEnabled(this.checked);
+    });
+    document.getElementById("chk-midi").addEventListener("change", function() {
+        SeestarJazz.setMidiEnabled(this.checked);
+        if (this.checked) {
+            SeestarJazz.initMidi().then(function(ok) {
+                if (!ok) showToast("MIDI niedostępne w tej przeglądarce", true);
+            });
+        }
+    });
+
+    // MIDI device selector
+    var selMidiDevice = document.getElementById("sel-midi-device");
+    SeestarJazz.onMidiDevicesChanged(function(devices) {
+        selMidiDevice.innerHTML = '<option value="">— brak —</option>';
+        devices.forEach(function(d) {
+            var opt = document.createElement("option");
+            opt.value = d.id;
+            opt.textContent = d.name;
+            selMidiDevice.appendChild(opt);
+        });
+        // Auto-select Roland LX-9 if found
+        for (var i = 0; i < devices.length; i++) {
+            if (/roland|lx.?9/i.test(devices[i].name)) {
+                selMidiDevice.value = devices[i].id;
+                SeestarJazz.selectMidiDevice(devices[i].id);
+                showToast("MIDI: " + devices[i].name);
+                break;
+            }
+        }
+    });
+    selMidiDevice.addEventListener("change", function() {
+        if (this.value) {
+            SeestarJazz.selectMidiDevice(this.value);
+            showToast("MIDI → " + selMidiDevice.options[selMidiDevice.selectedIndex].text);
+        }
+    });
+
+    // Refresh MIDI button
+    document.getElementById("btn-midi-refresh").addEventListener("click", function() {
+        SeestarJazz.initMidi().then(function(ok) {
+            showToast(ok ? "MIDI odświeżone" : "MIDI niedostępne", !ok);
+        });
+    });
+
+    // MIDI channel
+    var slMidiCh = document.getElementById("sl-midi-ch");
+    var valMidiCh = document.getElementById("val-midi-ch");
+    slMidiCh.addEventListener("input", function() {
+        valMidiCh.textContent = slMidiCh.value;
+        SeestarJazz.setMidiChannel(parseInt(slMidiCh.value) - 1);
+    });
+
+    // ═══════════════════════════════════════════════════════════════
+    // Image analysis → jazz engine (stars → density, colors → key)
+    // ═══════════════════════════════════════════════════════════════
+
+    var analysisCanvas = document.getElementById("analysis-canvas");
+    var analysisCtx = analysisCanvas.getContext("2d", {willReadFrequently: true});
+    var analysisTimer = null;
+    var ANALYSIS_SIZE = 128; // downsample to 128x128 for speed
+    analysisCanvas.width = ANALYSIS_SIZE;
+    analysisCanvas.height = ANALYSIS_SIZE;
+
+    // Hue → musical key mapping (color wheel → circle of fifths)
+    // 0°=red→C, 30°=orange→G, 60°=yellow→D, 90°=chartreuse→A,
+    // 120°=green→E, 150°=spring→B, 180°=cyan→F#, 210°=azure→Db,
+    // 240°=blue→Ab, 270°=violet→Eb, 300°=magenta→Bb, 330°=rose→F
+    var HUE_TO_KEY = [0, 7, 2, 9, 4, 11, 6, 1, 8, 3, 10, 5]; // circle of fifths
+
+    // Color diversity → scale complexity mapping
+    var DIVERSITY_SCALES = ["pentatonic", "major", "dorian", "mixolydian", "blues", "minor", "minpent", "diminished", "wholetone"];
+
+    function analyzeImage() {
+        if (!SeestarJazz.isRunning()) return;
+        if (!liveImg.naturalWidth) return;
+
+        try {
+            analysisCtx.drawImage(liveImg, 0, 0, ANALYSIS_SIZE, ANALYSIS_SIZE);
+        } catch(e) { return; } // CORS or broken image
+
+        var imageData = analysisCtx.getImageData(0, 0, ANALYSIS_SIZE, ANALYSIS_SIZE);
+        var px = imageData.data;
+        var totalPixels = ANALYSIS_SIZE * ANALYSIS_SIZE;
+
+        // ── Count bright pixels (stars) ──
+        var brightCount = 0;
+        var BRIGHT_THRESHOLD = 180;
+
+        // ── Build hue histogram (12 bins, like chromatic notes) ──
+        var hueBins = new Float32Array(12);
+        var satSum = 0;
+        var colorPixels = 0;
+
+        for (var i = 0; i < px.length; i += 4) {
+            var r = px[i], g = px[i+1], b = px[i+2];
+
+            // Luminance
+            var lum = 0.299 * r + 0.587 * g + 0.114 * b;
+            if (lum > BRIGHT_THRESHOLD) brightCount++;
+
+            // RGB → HSL (hue only, skip dark/gray pixels)
+            var max = Math.max(r, g, b), min = Math.min(r, g, b);
+            var delta = max - min;
+            if (delta < 20 || max < 40) continue; // skip gray/dark
+
+            colorPixels++;
+            var sat = delta / max;
+            satSum += sat;
+
+            var hue;
+            if (max === r) hue = ((g - b) / delta) % 6;
+            else if (max === g) hue = (b - r) / delta + 2;
+            else hue = (r - g) / delta + 4;
+            hue = ((hue * 60) + 360) % 360;
+
+            var bin = Math.floor(hue / 30) % 12;
+            hueBins[bin] += sat; // weight by saturation
+        }
+
+        // ── Star density → note density ──
+        var starRatio = brightCount / totalPixels;
+        // 0–0.01 → sparse, 0.01–0.05 → normal, 0.05+ → dense
+        SeestarJazz.setStarDensity(starRatio);
+
+        // ── Dominant hue → key ──
+        if (colorPixels > totalPixels * 0.02) {
+            var maxBin = 0, maxVal = 0;
+            for (var h = 0; h < 12; h++) {
+                if (hueBins[h] > maxVal) { maxVal = hueBins[h]; maxBin = h; }
+            }
+            var prevKey = SeestarJazz.getKey();
+            SeestarJazz.suggestKey(HUE_TO_KEY[maxBin]);
+            if (SeestarJazz.getKey() !== prevKey) {
+                selJazzKey.value = SeestarJazz.getKey();
+                addLogLine("Jazz auto-key → " + SeestarJazz.getKeyName());
+            }
+        }
+
+        // ── Color diversity → scale complexity ──
+        var total = 0;
+        for (var h2 = 0; h2 < 12; h2++) total += hueBins[h2];
+        if (total > 0) {
+            var entropy = 0;
+            for (var h3 = 0; h3 < 12; h3++) {
+                var p = hueBins[h3] / total;
+                if (p > 0.001) entropy -= p * Math.log2(p);
+            }
+            var prevScale = SeestarJazz.getScaleName();
+            var scaleIdx = Math.min(DIVERSITY_SCALES.length - 1, Math.floor(entropy / 3.58 * DIVERSITY_SCALES.length));
+            SeestarJazz.suggestScale(DIVERSITY_SCALES[scaleIdx]);
+            if (SeestarJazz.getScaleName() !== prevScale) {
+                selJazzScale.value = SeestarJazz.getScaleName();
+                addLogLine("Jazz auto-scale → " + SeestarJazz.getScaleDisplayName());
+            }
+        }
+    }
+
+    // Run analysis every 8 seconds (lightweight, only when jazz is on)
+    analysisTimer = setInterval(analyzeImage, 8000);
+
+    // ═══════════════════════════════════════════════════════════════
+    // Init — connect Alpaca device, then start stream + SSE
+    // ═══════════════════════════════════════════════════════════════
+
+    // Alpaca requires PUT connected=true before any commands
+    alpacaPut("connected", {Connected: "true"})
+        .then(function(r) {
+            if (r.ErrorNumber && r.ErrorNumber !== 0) {
+                console.warn("Alpaca connect:", r.ErrorMessage);
+            }
+        })
+        .catch(function() {});
+
+    startStream();
+    connectSSE();
+    connectEventSSE();
+})();
+</script>
+</body>
+</html>
