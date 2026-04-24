@@ -21,8 +21,9 @@
 <!-- Wide-angle PiP (top-right, toggle with W) -->
 <div id="wide-pip">
     <img id="wide-img" alt="">
-    <div id="wide-crosshair"></div>
+    <div id="wide-fov"></div>
     <span id="wide-label">WIDE</span>
+    <span id="wide-status"></span>
 </div>
 
 <!-- Status overlay (bottom-right, dark red) -->
@@ -43,6 +44,23 @@
         <span class="label">Status</span>
         <span class="value" id="ov-state">&mdash;</span>
     </div>
+</div>
+
+<!-- Quit confirmation -->
+<div id="quit-overlay">
+    <div id="quit-box">
+        <div id="quit-title">Zamknąć kiosk?</div>
+        <div id="quit-hint">Q / Enter — tak &nbsp;&nbsp; Esc — anuluj</div>
+    </div>
+</div>
+
+<!-- Mount mode switch overlay -->
+<div id="mount-overlay">
+    <div id="mount-overlay-icon">&#9881;</div>
+    <div id="mount-overlay-title"></div>
+    <div id="mount-overlay-steps"></div>
+    <div id="mount-overlay-status">Przełączam...</div>
+    <button id="mount-overlay-close">OK, rozumiem</button>
 </div>
 
 <!-- Error screen -->
@@ -126,6 +144,13 @@
             <div class="ctrl-row">
                 <button class="ctrl-btn" id="btn-track-on">Track ON</button>
                 <button class="ctrl-btn" id="btn-track-off">Track OFF</button>
+            </div>
+        </div>
+        <div class="pilot-section">
+            <label class="ctrl-label">Montaż <span id="mount-mode-label">—</span></label>
+            <div class="ctrl-row">
+                <button class="ctrl-btn mode-btn" id="btn-mount-altaz">Azymutalny</button>
+                <button class="ctrl-btn mode-btn" id="btn-mount-eq">Paralaktyczny</button>
             </div>
         </div>
         <div class="pilot-section">
@@ -233,6 +258,13 @@
             </div>
         </div>
         <div class="jazz-sect">
+            <label class="ctrl-label">Silnik <span id="jazz-engine-info"></span></label>
+            <div class="ctrl-row">
+                <button class="ctrl-btn" id="btn-engine-proc">Proceduralny</button>
+                <button class="ctrl-btn" id="btn-engine-ai">AI (MusicRNN)</button>
+            </div>
+        </div>
+        <div class="jazz-sect">
             <label class="ctrl-label">Tonacja</label>
             <div class="ctrl-row">
                 <select id="sel-jazz-key" class="ctrl-select">
@@ -289,7 +321,26 @@
 </div>
 
 <script src="catalog.js"></script>
+<!-- TensorFlow.js + Tone.js + Magenta MusicRNN (local) -->
+<script src="lib/tf.min.js"></script>
+<script src="lib/Tone.min.js"></script>
+<script src="lib/magenta-core.js"></script>
+<script src="lib/magenta-music-rnn.js"></script>
+<script>
+// Magenta ES6 builds export to self.core / self.music_rnn — assemble into mm
+var mm = Object.assign({}, self.core || {}, self.music_rnn || {});
+</script>
+<!-- Jazz engines: procedural (fallback) + AI -->
 <script src="jazz.js"></script>
+<script>var SeestarJazzProcedural = SeestarJazz;</script>
+<script src="jazz-ai.js"></script>
+<!-- SeestarJazzAI is exported directly by jazz-ai.js -->
+<script>
+// Default to AI engine, fallback to procedural if libs missing
+SeestarJazz = (typeof Tone !== 'undefined' && typeof mm !== 'undefined')
+    ? SeestarJazzAI
+    : SeestarJazzProcedural;
+</script>
 <script>
 (function() {
     "use strict";
@@ -336,6 +387,82 @@
             wideImg.src = WIDE_URL + "?t=" + Date.now();
         }
     }
+
+    // ═══════════════════════════════════════════════════════════════
+    // Wide-angle health monitoring
+    // ═══════════════════════════════════════════════════════════════
+
+    var wideStatusEl = document.getElementById("wide-status");
+    var WIDE_HEALTH_URL = "http://" + HOST + ":" + WIDE_PORT + "/health";
+    var wideHealthTimer = null;
+
+    function checkWideHealth() {
+        if (!wideVisible) return;
+        fetch(WIDE_HEALTH_URL)
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+                if (!d.ok || d.frame_age > 5) {
+                    wideStatusEl.textContent = "RECONNECTING...";
+                    wideStatusEl.classList.add("visible");
+                } else {
+                    wideStatusEl.classList.remove("visible");
+                }
+            })
+            .catch(function() {
+                wideStatusEl.textContent = "OFFLINE";
+                wideStatusEl.classList.add("visible");
+            });
+    }
+
+    // Start/stop health polling when wide PiP visibility changes
+    function startWideHealth() {
+        if (wideHealthTimer) return;
+        checkWideHealth();
+        wideHealthTimer = setInterval(checkWideHealth, 4000);
+    }
+
+    function stopWideHealth() {
+        if (wideHealthTimer) { clearInterval(wideHealthTimer); wideHealthTimer = null; }
+        wideStatusEl.classList.remove("visible");
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // Click-to-slew on wide PiP
+    // ═══════════════════════════════════════════════════════════════
+
+    // Wide camera FOV ~50°, main telescope FOV ~1.3°
+    var WIDE_FOV_DEG = 50;
+
+    widePip.addEventListener("click", function(e) {
+        // Don't slew if clicking label area
+        if (e.target.id === "wide-label" || e.target.id === "wide-status") return;
+
+        var rect = widePip.getBoundingClientRect();
+        // Click offset from center, normalized to -0.5..+0.5
+        var nx = (e.clientX - rect.left) / rect.width - 0.5;
+        var ny = (e.clientY - rect.top) / rect.height - 0.5;
+
+        // Convert to degrees offset
+        var dAz = nx * WIDE_FOV_DEG;  // horizontal offset in degrees
+        var dAlt = -ny * WIDE_FOV_DEG * (rect.height / rect.width); // vertical (inverted)
+
+        // Use scope_speed_move with angle & duration to approximate the offset
+        // Calculate angle (0°=N, 90°=E, 180°=S, 270°=W)
+        var angle = (Math.atan2(dAz, -dAlt) * 180 / Math.PI + 360) % 360;
+        var dist = Math.sqrt(dAz * dAz + dAlt * dAlt);
+
+        // Scale: speed 5 moves ~0.5°/s → duration = dist / 0.5
+        var speed = 5;
+        var dur = Math.max(1, Math.min(30, Math.round(dist / 0.5)));
+
+        showToast("Wide → slew " + dist.toFixed(1) + "°");
+        alpacaAction("method_sync", {
+            method: "scope_speed_move",
+            params: {speed: speed, angle: Math.round(angle), dur_sec: dur}
+        }).then(function() {
+            setTimeout(reloadWideStream, (dur + 1) * 1000);
+        });
+    });
 
     // ═══════════════════════════════════════════════════════════════
     // ALPACA API helpers
@@ -545,6 +672,92 @@
     var valTimelapse = document.getElementById("val-timelapse");
     slTimelapse.addEventListener("input", function() { valTimelapse.textContent = slTimelapse.value; });
 
+    // ── Audio recorder (captures jazz engine output during video REC) ──
+    var audioRecorder = null;
+    var audioChunks = [];
+    var audioRecStartTime = null;
+
+    function startAudioRecording() {
+        // Get the AudioContext from whichever engine is active
+        var ctx = null;
+        if (typeof Tone !== "undefined" && Tone.context && Tone.context.rawContext) {
+            ctx = Tone.context.rawContext;
+        } else if (typeof Tone !== "undefined" && Tone.context) {
+            ctx = Tone.context._context || Tone.context;
+        }
+        // Fallback: procedural engine uses plain AudioContext
+        if (!ctx && window.AudioContext) {
+            // Try to find it from the audio graph
+            try {
+                var testNode = new (window.AudioContext || window.webkitAudioContext)();
+                testNode.close();
+            } catch(e) {}
+        }
+        if (!ctx) {
+            console.warn("[audio-rec] No AudioContext available");
+            return;
+        }
+
+        try {
+            var dest = ctx.createMediaStreamDestination();
+            // Also connect destination to capture node
+            // We need to tap into the output — connect a splitter
+            // Easiest: use Tone.js Recorder if available, otherwise MediaRecorder on destination stream
+            var stream = dest.stream;
+
+            // Connect the master output to our recording destination
+            if (typeof Tone !== "undefined" && Tone.getDestination) {
+                Tone.getDestination().connect(dest);
+            } else if (typeof Tone !== "undefined" && Tone.Master) {
+                Tone.Master.connect(dest);
+            }
+
+            audioChunks = [];
+            audioRecorder = new MediaRecorder(stream, {
+                mimeType: MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+                    ? "audio/webm;codecs=opus"
+                    : "audio/webm"
+            });
+
+            audioRecorder.addEventListener("dataavailable", function(e) {
+                if (e.data.size > 0) audioChunks.push(e.data);
+            });
+
+            audioRecorder.addEventListener("stop", function() {
+                if (audioChunks.length === 0) return;
+                var blob = new Blob(audioChunks, {type: audioRecorder.mimeType});
+                var ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+                var url = URL.createObjectURL(blob);
+                var a = document.createElement("a");
+                a.href = url;
+                a.download = "seestar-jazz-" + ts + ".webm";
+                a.click();
+                setTimeout(function() { URL.revokeObjectURL(url); }, 5000);
+                showToast("Audio zapisane: " + a.download);
+                audioChunks = [];
+            });
+
+            audioRecorder.start(1000); // collect chunks every 1s
+            audioRecStartTime = Date.now();
+            console.log("[audio-rec] Recording started");
+        } catch(e) {
+            console.warn("[audio-rec] Failed to start:", e);
+            audioRecorder = null;
+        }
+    }
+
+    function stopAudioRecording() {
+        if (!audioRecorder || audioRecorder.state === "inactive") return;
+        var duration = Math.round((Date.now() - audioRecStartTime) / 1000);
+        console.log("[audio-rec] Stopping after " + duration + "s");
+        audioRecorder.stop();
+        audioRecorder = null;
+        // Disconnect recording destination
+        if (typeof Tone !== "undefined" && Tone.getDestination) {
+            try { Tone.getDestination().disconnect(); Tone.getDestination().toDestination(); } catch(e) {}
+        }
+    }
+
     document.getElementById("btn-rec").addEventListener("click", function() {
         var tl = parseInt(slTimelapse.value);
         var params = {raw: false};
@@ -554,12 +767,23 @@
             .then(function(r) {
                 var val = r.Value || r;
                 if (val && val.error) showToast("Błąd: " + JSON.stringify(val.error), true);
-                else showToast("Nagrywanie...");
+                else {
+                    showToast("Nagrywanie...");
+                    // Start audio recording if jazz is playing
+                    if (SeestarJazz.isRunning()) {
+                        startAudioRecording();
+                        showToast("Nagrywanie video + audio jazz");
+                    }
+                }
             });
     });
 
     document.getElementById("btn-rec-stop").addEventListener("click", function() {
         showToast("Stop REC...");
+        // Stop audio recording first (triggers download)
+        if (audioRecorder && audioRecorder.state !== "inactive") {
+            stopAudioRecording();
+        }
         alpacaAction("method_sync", {method: "stop_record_avi", params: {}})
             .then(function(r) {
                 var val = r.Value || r;
@@ -775,6 +999,116 @@
     });
 
     // ═══════════════════════════════════════════════════════════════
+    // Mount mode — Azymutalny (Alt-Az) / Paralaktyczny (EQ)
+    // ═══════════════════════════════════════════════════════════════
+
+    var btnMountAltaz = document.getElementById("btn-mount-altaz");
+    var btnMountEQ = document.getElementById("btn-mount-eq");
+    var mountModeLabel = document.getElementById("mount-mode-label");
+    var mountOverlay = document.getElementById("mount-overlay");
+    var mountOverlayTitle = document.getElementById("mount-overlay-title");
+    var mountOverlaySteps = document.getElementById("mount-overlay-steps");
+    var mountOverlayStatus = document.getElementById("mount-overlay-status");
+    var currentMountEQ = false;
+
+    var MOUNT_INSTRUCTIONS = {
+        eq: {
+            title: "Przełączanie na tryb paralaktyczny (EQ)",
+            steps: [
+                "Teleskop zostanie zaparkowany",
+                "Zamontuj klin paralaktyczny (wedge)",
+                "Ustaw klin na szerokość geograficzną",
+                "Wyceluj oś w biegun północny (Polaris)",
+                "Po zaparkowaniu: Open Arm i wykonaj 3PPA"
+            ]
+        },
+        altaz: {
+            title: "Przełączanie na tryb azymutalny",
+            steps: [
+                "Teleskop zostanie zaparkowany",
+                "Zdejmij klin paralaktyczny (jeśli zamontowany)",
+                "Postaw teleskop na płaskiej powierzchni",
+                "Po zaparkowaniu: Open Arm i gotowe"
+            ]
+        }
+    };
+
+    function updateMountButtons() {
+        btnMountAltaz.classList.toggle("active", !currentMountEQ);
+        btnMountEQ.classList.toggle("active", currentMountEQ);
+        mountModeLabel.textContent = currentMountEQ ? "EQ" : "Alt-Az";
+    }
+
+    var mountOverlayClose = document.getElementById("mount-overlay-close");
+
+    function showMountOverlay(mode) {
+        var info = MOUNT_INSTRUCTIONS[mode];
+        mountOverlayTitle.textContent = info.title;
+        mountOverlaySteps.innerHTML = info.steps.map(function(s, i) {
+            return '<div class="step"><span class="step-num">' + (i + 1) + '.</span><span>' + s + '</span></div>';
+        }).join("");
+        mountOverlayStatus.textContent = "Parkuję teleskop...";
+        mountOverlayClose.classList.remove("visible");
+        mountOverlay.classList.add("visible");
+    }
+
+    function mountOverlayReady(success, msg) {
+        mountOverlayStatus.textContent = msg;
+        var firstStep = mountOverlaySteps.querySelector(".step");
+        if (firstStep && success) firstStep.classList.add("step-done");
+        mountOverlayClose.classList.add("visible");
+    }
+
+    mountOverlayClose.addEventListener("click", function() {
+        mountOverlay.classList.remove("visible");
+    });
+
+    function switchMountMode(toEQ) {
+        showMountOverlay(toEQ ? "eq" : "altaz");
+        alpacaAction("method_sync", {method: "scope_park", params: {equ_mode: toEQ}})
+            .then(function(r) {
+                var val = r.Value || r;
+                if (val && val.error) {
+                    mountOverlayReady(false, "Błąd: " + JSON.stringify(val.error));
+                    showToast("Błąd przełączania montażu", true);
+                } else {
+                    currentMountEQ = toEQ;
+                    updateMountButtons();
+                    mountOverlayReady(true, "Zaparkowano. Wykonaj kroki powyżej, potem Open Arm.");
+                    showToast("Montaż: " + (toEQ ? "paralaktyczny (EQ)" : "azymutalny"));
+                }
+            })
+            .catch(function(err) {
+                mountOverlayReady(false, "Błąd połączenia: " + err.message);
+            });
+    }
+
+    // Read current mount mode from device state
+    function fetchMountMode() {
+        alpacaAction("method_sync", {method: "get_device_state", params: {}})
+            .then(function(r) {
+                var val = r.Value || r;
+                if (val && val.mount && val.mount.equ_mode !== undefined) {
+                    currentMountEQ = !!val.mount.equ_mode;
+                    updateMountButtons();
+                }
+            }).catch(function() {});
+    }
+
+    btnMountAltaz.addEventListener("click", function() {
+        if (!currentMountEQ) { showToast("Już w trybie azymutalnym"); return; }
+        switchMountMode(false);
+    });
+
+    btnMountEQ.addEventListener("click", function() {
+        if (currentMountEQ) { showToast("Już w trybie paralaktycznym"); return; }
+        switchMountMode(true);
+    });
+
+    // Fetch initial mount mode
+    setTimeout(fetchMountMode, 3000);
+
+    // ═══════════════════════════════════════════════════════════════
     // Panel toggle
     // ═══════════════════════════════════════════════════════════════
 
@@ -899,10 +1233,40 @@
     }
 
     // ═══════════════════════════════════════════════════════════════
+    // Quit confirmation
+    // ═══════════════════════════════════════════════════════════════
+
+    var quitOverlay = document.getElementById("quit-overlay");
+    var quitPending = false;
+
+    function requestQuit() {
+        quitPending = true;
+        quitOverlay.classList.add("visible");
+    }
+
+    function confirmQuit() {
+        window.close();
+        document.body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100vh;color:#5a0000;font-size:20px;font-family:monospace">Zamknij tę kartę ręcznie (Cmd+W)</div>';
+    }
+
+    function cancelQuit() {
+        quitPending = false;
+        quitOverlay.classList.remove("visible");
+    }
+
+    // ═══════════════════════════════════════════════════════════════
     // Keyboard controls
     // ═══════════════════════════════════════════════════════════════
 
     document.addEventListener("keydown", function(e) {
+        // Quit confirmation mode
+        if (quitPending) {
+            if (e.key === "q" || e.key === "Q" || e.key === "Enter") { confirmQuit(); }
+            else { cancelQuit(); }
+            e.preventDefault();
+            return;
+        }
+
         // Ignore keyboard shortcuts when in form controls
         if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT") {
             if (e.key === "Escape") { e.target.blur(); e.preventDefault(); }
@@ -911,9 +1275,10 @@
         switch (e.key) {
             case "q": case "Q": case "Escape":
                 if (ctrlVisible) { togglePanel(); }
-                else {
-                    window.close();
-                    document.body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100vh;color:#5a0000;font-size:20px;font-family:monospace">Zamknij tę kartę ręcznie (Cmd+W)</div>';
+                else if (mountOverlay.classList.contains("visible")) {
+                    mountOverlay.classList.remove("visible");
+                } else {
+                    requestQuit();
                 }
                 break;
             case "f": case "F":
@@ -926,8 +1291,11 @@
             case "w": case "W":
                 wideVisible = !wideVisible;
                 widePip.classList.toggle("visible", wideVisible);
-                if (wideVisible && !wideImg.src) {
+                if (wideVisible) {
                     wideImg.src = WIDE_URL + "?t=" + Date.now();
+                    startWideHealth();
+                } else {
+                    stopWideHealth();
                 }
                 break;
             case "d": case "D":
@@ -953,12 +1321,50 @@
 
     var jazzStatusEl = document.getElementById("jazz-status");
     var jazzBadge = document.getElementById("jazz-badge");
+    var jazzEngineInfo = document.getElementById("jazz-engine-info");
+    var btnEngineProc = document.getElementById("btn-engine-proc");
+    var btnEngineAI = document.getElementById("btn-engine-ai");
+
+    function updateEngineLabel() {
+        var isAI = (SeestarJazz === SeestarJazzAI);
+        jazzEngineInfo.textContent = isAI ? "AI" : "Proc";
+        btnEngineAI.classList.toggle("active", isAI);
+        btnEngineProc.classList.toggle("active", !isAI);
+        if (isAI && typeof SeestarJazz.isModelReady === "function") {
+            jazzEngineInfo.textContent = SeestarJazz.isModelReady() ? "AI ✓" : "AI (ładuję...)";
+        }
+    }
+
+    function switchEngine(engine) {
+        var wasRunning = SeestarJazz.isRunning();
+        if (wasRunning) SeestarJazz.stop();
+        SeestarJazz = engine;
+        if (wasRunning) {
+            SeestarJazz.start();
+            jazzStatusEl.textContent = "ON";
+            jazzBadge.classList.add("visible");
+        }
+        updateEngineLabel();
+        showToast("Silnik: " + (engine === SeestarJazzAI ? "AI (MusicRNN)" : "Proceduralny"));
+    }
+
+    btnEngineProc.addEventListener("click", function() { switchEngine(SeestarJazzProcedural); });
+    btnEngineAI.addEventListener("click", function() {
+        if (typeof Tone === "undefined" || typeof mm === "undefined") {
+            showToast("Brak Tone.js / Magenta (potrzebny internet)", true);
+            return;
+        }
+        switchEngine(SeestarJazzAI);
+    });
+
+    updateEngineLabel();
 
     function toggleJazz() {
         var on = SeestarJazz.toggle();
         jazzStatusEl.textContent = on ? "ON" : "OFF";
         jazzBadge.classList.toggle("visible", on);
         showToast(on ? "Jazz ON" : "Jazz OFF");
+        if (on) updateEngineLabel();
     }
 
     document.getElementById("btn-jazz-toggle").addEventListener("click", toggleJazz);
@@ -1161,6 +1567,9 @@
                 selJazzScale.value = SeestarJazz.getScaleName();
                 addLogLine("Jazz auto-scale → " + SeestarJazz.getScaleDisplayName());
             }
+            // Color diversity → octave range (0 = monochrome/narrow, 1 = rainbow/full piano)
+            var normalizedDiversity = Math.min(1, entropy / 3.58);
+            SeestarJazz.setColorDiversity(normalizedDiversity);
         }
     }
 
@@ -1183,6 +1592,23 @@
     startStream();
     connectSSE();
     connectEventSSE();
+
+    // Preload AI engine — model download takes time, start immediately
+    if (typeof mm !== "undefined" && mm.MusicRNN) {
+        console.log("[init] Preloading MusicRNN model...");
+        var preloadRnn = new mm.MusicRNN(
+            "lib/magenta-model/"
+        );
+        preloadRnn.initialize().then(function() {
+            console.log("[init] MusicRNN model ready");
+            // Inject into AI engine so it doesn't reload
+            if (typeof SeestarJazzAI !== "undefined" && SeestarJazzAI._setPreloadedModel) {
+                SeestarJazzAI._setPreloadedModel(preloadRnn);
+            }
+        }).catch(function(e) {
+            console.warn("[init] MusicRNN preload failed:", e);
+        });
+    }
 })();
 </script>
 </body>

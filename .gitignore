@@ -9,6 +9,9 @@ logs/
 # Vendor (submodule or separate)
 vendor/
 
+# Vendored JS libs (Tone.js, Magenta)
+kiosk/lib/
+
 # macOS
 .DS_Store
 

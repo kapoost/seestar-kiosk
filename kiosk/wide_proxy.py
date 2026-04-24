@@ -5,6 +5,7 @@ Reads RTSP from telescope:4555/stream via OpenCV, serves MJPEG on local port.
 """
 from __future__ import annotations
 
+import json
 import sys
 import threading
 import time
@@ -19,15 +20,21 @@ CORS(app)
 # Shared state
 _lock = threading.Lock()
 _frame: bytes | None = None
+_frame_ts: float = 0  # timestamp of last captured frame
 _running = True
+
+# Output width (height scales proportionally)
+OUTPUT_WIDTH = 640
 
 
 def rtsp_reader(uri: str):
     """Background thread: read RTSP frames into shared buffer."""
-    global _frame, _running
+    global _frame, _frame_ts, _running
     while _running:
         try:
-            cap = cv2.VideoCapture(uri)
+            # Force TCP transport for reliability
+            cap = cv2.VideoCapture(uri, cv2.CAP_FFMPEG)
+            cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
             if not cap.isOpened():
                 print(f"[wide] Cannot open {uri}, retrying in 3s...", file=sys.stderr)
                 time.sleep(3)
@@ -37,10 +44,17 @@ def rtsp_reader(uri: str):
                 ret, img = cap.read()
                 if not ret:
                     break
-                ok, buf = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, 70])
+                # Resize to OUTPUT_WIDTH for bandwidth savings
+                h, w = img.shape[:2]
+                if w > OUTPUT_WIDTH:
+                    scale = OUTPUT_WIDTH / w
+                    img = cv2.resize(img, (OUTPUT_WIDTH, int(h * scale)),
+                                     interpolation=cv2.INTER_AREA)
+                ok, buf = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, 85])
                 if ok:
                     with _lock:
                         _frame = buf.tobytes()
+                        _frame_ts = time.time()
                 time.sleep(0.05)  # ~20 fps cap
             cap.release()
             print("[wide] RTSP disconnected, reconnecting...", file=sys.stderr)
@@ -69,7 +83,13 @@ def vid():
 
 @app.route("/health")
 def health():
-    return "ok"
+    with _lock:
+        ts = _frame_ts
+    age = time.time() - ts if ts > 0 else -1
+    return Response(
+        json.dumps({"ok": age < 5 and age >= 0, "frame_age": round(age, 1), "ts": ts}),
+        mimetype="application/json",
+    )
 
 
 def main():

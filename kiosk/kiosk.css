@@ -95,37 +95,68 @@ html, body {
     object-fit: cover;
 }
 
-#wide-crosshair {
+/* FOV rectangle — shows main telescope field of view on wide image */
+/* Wide ~50° FOV, Main ~1.3° FOV → ratio ~1:38 → ~7px on 280px PiP */
+#wide-fov {
     position: absolute;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    width: 40px;
-    height: 40px;
+    width: 8px;
+    height: 6px;
+    border: 1px solid rgba(255, 50, 50, 0.85);
+    box-shadow: 0 0 4px rgba(255, 50, 50, 0.4), inset 0 0 2px rgba(255, 50, 50, 0.15);
     pointer-events: none;
+    z-index: 2;
 }
 
-#wide-crosshair::before,
-#wide-crosshair::after {
+/* Corner ticks extending from FOV rect for visibility */
+#wide-fov::before,
+#wide-fov::after {
     content: "";
     position: absolute;
-    background: rgba(255, 50, 50, 0.7);
+    background: rgba(255, 50, 50, 0.6);
 }
 
-#wide-crosshair::before {
+#wide-fov::before {
+    /* Horizontal crosshair line */
     top: 50%;
-    left: 0;
-    width: 100%;
+    left: -12px;
+    width: calc(100% + 24px);
     height: 1px;
     transform: translateY(-50%);
 }
 
-#wide-crosshair::after {
+#wide-fov::after {
+    /* Vertical crosshair line */
     left: 50%;
-    top: 0;
+    top: -12px;
     width: 1px;
-    height: 100%;
+    height: calc(100% + 24px);
     transform: translateX(-50%);
+}
+
+/* Wide stream status indicator */
+#wide-status {
+    position: absolute;
+    bottom: 6px;
+    right: 8px;
+    font-size: 9px;
+    color: #ff4444;
+    background: rgba(0, 0, 0, 0.7);
+    padding: 1px 5px;
+    border-radius: 2px;
+    display: none;
+    z-index: 3;
+}
+
+#wide-status.visible {
+    display: block;
+}
+
+/* Click-to-slew cursor */
+#wide-pip.visible {
+    cursor: crosshair;
 }
 
 #wide-label {
@@ -179,6 +210,188 @@ html, body {
     display: flex;
     justify-content: space-between;
     gap: 16px;
+}
+
+/* --- Quit confirmation --- */
+#quit-overlay {
+    position: absolute;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.75);
+    z-index: 70;
+}
+
+#quit-overlay.visible {
+    display: flex;
+}
+
+#quit-box {
+    text-align: center;
+}
+
+#quit-title {
+    color: #cc3333;
+    font-size: 28px;
+    font-weight: 700;
+}
+
+#quit-hint {
+    color: #5a0000;
+    font-size: 14px;
+    margin-top: 14px;
+    letter-spacing: 0.03em;
+}
+
+.day-mode #quit-title {
+    color: #fff;
+}
+
+.day-mode #quit-hint {
+    color: #aaa;
+}
+
+/* --- Mount mode switch overlay --- */
+#mount-overlay {
+    position: absolute;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    background: rgba(0, 0, 0, 0.88);
+    z-index: 60;
+    pointer-events: none;
+    animation: mount-fade-in 0.3s ease;
+}
+
+#mount-overlay.visible {
+    display: flex;
+}
+
+@keyframes mount-fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+#mount-overlay-icon {
+    font-size: 48px;
+    color: #cc3333;
+    margin-bottom: 16px;
+    animation: mount-spin 2s linear infinite;
+}
+
+@keyframes mount-spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+#mount-overlay-title {
+    color: #cc3333;
+    font-size: 22px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 20px;
+}
+
+#mount-overlay-steps {
+    color: #8b0000;
+    font-size: 14px;
+    line-height: 2.2;
+    text-align: left;
+    max-width: 440px;
+}
+
+#mount-overlay-steps .step {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+}
+
+#mount-overlay-steps .step-num {
+    color: #cc3333;
+    font-weight: 700;
+    font-size: 16px;
+    min-width: 22px;
+    text-align: right;
+}
+
+#mount-overlay-steps .step-done {
+    opacity: 0.4;
+}
+
+#mount-overlay-status {
+    margin-top: 24px;
+    color: #cc3333;
+    font-size: 13px;
+    letter-spacing: 0.05em;
+    animation: mount-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes mount-pulse {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 1; }
+}
+
+#mount-overlay-close {
+    margin-top: 28px;
+    padding: 10px 32px;
+    background: #2a0000;
+    border: 1px solid #cc3333;
+    border-radius: 6px;
+    color: #cc3333;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    display: none;
+    pointer-events: auto;
+}
+
+#mount-overlay-close:hover {
+    background: #3a0000;
+    color: #ff4444;
+}
+
+#mount-overlay-close.visible {
+    display: block;
+}
+
+/* Day mode */
+.day-mode #mount-overlay-close {
+    background: #4a7dff;
+    border-color: #4a7dff;
+    color: #fff;
+}
+
+.day-mode #mount-overlay-close:hover {
+    background: #3366ee;
+}
+
+.day-mode #mount-overlay {
+    background: rgba(26, 26, 46, 0.92);
+}
+
+.day-mode #mount-overlay-icon {
+    color: #4a7dff;
+}
+
+.day-mode #mount-overlay-title {
+    color: #fff;
+}
+
+.day-mode #mount-overlay-steps {
+    color: #ccc;
+}
+
+.day-mode #mount-overlay-steps .step-num {
+    color: #4a7dff;
+}
+
+.day-mode #mount-overlay-status {
+    color: #4a7dff;
 }
 
 /* --- Error screen --- */
@@ -1037,6 +1250,20 @@ body:has(#jazz-panel.open) #wide-pip {
     color: #dc3545;
 }
 
+#btn-engine-proc.active,
+#btn-engine-ai.active {
+    background: #2a0000;
+    border-color: #cc3333;
+    color: #ff4444;
+}
+
+.day-mode #btn-engine-proc.active,
+.day-mode #btn-engine-ai.active {
+    background: #4a7dff;
+    border-color: #4a7dff;
+    color: #fff;
+}
+
 .day-mode .mode-btn.active {
     background: #4a7dff;
     border-color: #4a7dff;
@@ -1053,9 +1280,19 @@ body:has(#jazz-panel.open) #wide-pip {
     background: #f1b0b7 !important;
 }
 
-.day-mode #wide-crosshair::before,
-.day-mode #wide-crosshair::after {
-    background: rgba(255, 50, 50, 0.9);
+.day-mode #wide-fov {
+    border-color: rgba(255, 50, 50, 0.95);
+    box-shadow: 0 0 6px rgba(255, 50, 50, 0.5), inset 0 0 2px rgba(255, 50, 50, 0.2);
+}
+
+.day-mode #wide-fov::before,
+.day-mode #wide-fov::after {
+    background: rgba(255, 50, 50, 0.8);
+}
+
+.day-mode #wide-status {
+    color: #dc3545;
+    background: rgba(255, 255, 255, 0.8);
 }
 
 /* ═══════════════════════════════════════════════════════════════
