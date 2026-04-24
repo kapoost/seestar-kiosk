@@ -15,6 +15,9 @@ ALP_PID_FILE="$LOGS_DIR/seestar_alp.pid"
 ALP_LOG_FILE="$LOGS_DIR/seestar_alp.log"
 WIDE_PID_FILE="$LOGS_DIR/wide_proxy.pid"
 WIDE_LOG_FILE="$LOGS_DIR/wide_proxy.log"
+KIOSK_PID_FILE="$LOGS_DIR/kiosk_http.pid"
+KIOSK_LOG_FILE="$LOGS_DIR/kiosk_http.log"
+KIOSK_HTTP_PORT=8888
 
 PYTHON="$VENV_PATH/bin/python"
 
@@ -44,6 +47,13 @@ cleanup() {
         rm -f "$WIDE_PID_FILE"
     fi
     pkill -f wide_proxy.py 2>/dev/null || true
+    echo "Zamykam kiosk HTTP server..."
+    if [[ -f "$KIOSK_PID_FILE" ]]; then
+        local hpid
+        hpid=$(cat "$KIOSK_PID_FILE")
+        kill "$hpid" 2>/dev/null || true
+        rm -f "$KIOSK_PID_FILE"
+    fi
     echo "Zamykam Chrome kiosk..."
     osascript -e 'tell application "Google Chrome" to close (every window whose name contains "Seestar Kiosk")' 2>/dev/null || true
     echo "Gotowe."
@@ -175,8 +185,17 @@ WIDE_PID=$!
 echo "$WIDE_PID" > "$WIDE_PID_FILE"
 echo "wide_proxy PID: $WIDE_PID"
 
+# ─── Kiosk HTTP server (serves local JS/model/samples) ─────────
+echo "Uruchamiam kiosk HTTP server (port $KIOSK_HTTP_PORT)..."
+# Kill stale server on this port
+lsof -t -i ":${KIOSK_HTTP_PORT}" -s TCP:LISTEN 2>/dev/null | xargs kill 2>/dev/null || true
+nohup "$PYTHON" -m http.server "$KIOSK_HTTP_PORT" --directory "$SCRIPT_DIR" --bind 127.0.0.1 > "$KIOSK_LOG_FILE" 2>&1 &
+KIOSK_HTTP_PID=$!
+echo "$KIOSK_HTTP_PID" > "$KIOSK_PID_FILE"
+echo "Kiosk HTTP PID: $KIOSK_HTTP_PID"
+
 # ─── 7. Open kiosk in Chrome ────────────────────────────────────
-KIOSK_URL="file://$SCRIPT_DIR/kiosk.html?host=localhost&imgport=${IMG_PORT}&devnum=${DEVICE_NUM}&alpacaport=${ALPACA_PORT}&wideport=${WIDE_PORT}"
+KIOSK_URL="http://localhost:${KIOSK_HTTP_PORT}/kiosk.html?host=localhost&imgport=${IMG_PORT}&devnum=${DEVICE_NUM}&alpacaport=${ALPACA_PORT}&wideport=${WIDE_PORT}"
 
 echo ""
 echo "Otwieram kiosk w Chrome..."
