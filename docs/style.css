@@ -142,10 +142,29 @@ h2 {
     left: 50%;
     transform: translateX(-50%);
     color: #5a0000;
-    font-size: 12px;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 700;
     letter-spacing: 0.08em;
     z-index: 1;
     animation: hint-pulse 2s ease-in-out infinite;
+    background: rgba(5, 0, 0, 0.92);
+    border: 1px solid #3a0000;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s, color 0.2s;
+    padding: 0;
+}
+
+.hero-hint:hover {
+    background: #2a0000;
+    border-color: #cc3333;
+    color: #cc3333;
 }
 
 @keyframes hint-pulse {
@@ -409,6 +428,14 @@ footer a {
 
 .day-mode .hero-hint {
     color: #556;
+    background: rgba(245, 245, 250, 0.1);
+    border-color: #334;
+}
+
+.day-mode .hero-hint:hover {
+    background: rgba(74, 125, 255, 0.15);
+    border-color: #4a7dff;
+    color: #4a7dff;
 }
 
 .day-mode .feature-card {

@@ -68,12 +68,21 @@ test.describe('Landing page — structure', () => {
 
 test.describe('Landing page — day/night toggle', () => {
     test.beforeEach(async ({ page }) => {
+        // Force dark color scheme so auto-detect picks night mode
+        await page.emulateMedia({ colorScheme: 'dark' });
         await page.goto('/');
     });
 
-    test('starts in night mode (no day-mode class)', async ({ page }) => {
+    test('starts in night mode with dark OS preference', async ({ page }) => {
         const html = page.locator('html');
         await expect(html).not.toHaveClass(/day-mode/);
+    });
+
+    test('starts in day mode with light OS preference', async ({ page }) => {
+        await page.emulateMedia({ colorScheme: 'light' });
+        await page.goto('/');
+        const html = page.locator('html');
+        await expect(html).toHaveClass(/day-mode/);
     });
 
     test('pressing D toggles day mode', async ({ page }) => {
@@ -87,6 +96,18 @@ test.describe('Landing page — day/night toggle', () => {
         await page.keyboard.press('d');
         await page.keyboard.press('d');
         await expect(html).not.toHaveClass(/day-mode/);
+    });
+
+    test('clicking D button toggles day mode (mobile)', async ({ page }) => {
+        const html = page.locator('html');
+        await page.locator('#day-toggle').click();
+        await expect(html).toHaveClass(/day-mode/);
+    });
+
+    test('D button exists and is visible', async ({ page }) => {
+        const btn = page.locator('#day-toggle');
+        await expect(btn).toBeVisible();
+        await expect(btn).toHaveText('D');
     });
 });
 
