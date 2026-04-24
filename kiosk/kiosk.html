@@ -233,6 +233,13 @@
             </div>
         </div>
         <div class="jazz-sect">
+            <label class="ctrl-label">Silnik <span id="jazz-engine-info"></span></label>
+            <div class="ctrl-row">
+                <button class="ctrl-btn" id="btn-engine-proc">Proceduralny</button>
+                <button class="ctrl-btn" id="btn-engine-ai">AI (MusicRNN)</button>
+            </div>
+        </div>
+        <div class="jazz-sect">
             <label class="ctrl-label">Tonacja</label>
             <div class="ctrl-row">
                 <select id="sel-jazz-key" class="ctrl-select">
@@ -289,7 +296,21 @@
 </div>
 
 <script src="catalog.js"></script>
+<!-- Tone.js + Magenta MusicRNN (CDN) -->
+<script src="https://cdn.jsdelivr.net/npm/tone@14/build/Tone.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@magenta/music@1.23.1/es6/core.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@magenta/music@1.23.1/es6/music_rnn.js"></script>
+<!-- Jazz engines: procedural (fallback) + AI -->
 <script src="jazz.js"></script>
+<script>var SeestarJazzProcedural = SeestarJazz;</script>
+<script src="jazz-ai.js"></script>
+<script>var SeestarJazzAI = SeestarJazz;</script>
+<script>
+// Default to AI engine, fallback to procedural if libs missing
+SeestarJazz = (typeof Tone !== 'undefined' && typeof mm !== 'undefined')
+    ? SeestarJazzAI
+    : SeestarJazzProcedural;
+</script>
 <script>
 (function() {
     "use strict";
@@ -953,12 +974,50 @@
 
     var jazzStatusEl = document.getElementById("jazz-status");
     var jazzBadge = document.getElementById("jazz-badge");
+    var jazzEngineInfo = document.getElementById("jazz-engine-info");
+    var btnEngineProc = document.getElementById("btn-engine-proc");
+    var btnEngineAI = document.getElementById("btn-engine-ai");
+
+    function updateEngineLabel() {
+        var isAI = (SeestarJazz === SeestarJazzAI);
+        jazzEngineInfo.textContent = isAI ? "AI" : "Proc";
+        btnEngineAI.classList.toggle("active", isAI);
+        btnEngineProc.classList.toggle("active", !isAI);
+        if (isAI && typeof SeestarJazz.isModelReady === "function") {
+            jazzEngineInfo.textContent = SeestarJazz.isModelReady() ? "AI ✓" : "AI (ładuję...)";
+        }
+    }
+
+    function switchEngine(engine) {
+        var wasRunning = SeestarJazz.isRunning();
+        if (wasRunning) SeestarJazz.stop();
+        SeestarJazz = engine;
+        if (wasRunning) {
+            SeestarJazz.start();
+            jazzStatusEl.textContent = "ON";
+            jazzBadge.classList.add("visible");
+        }
+        updateEngineLabel();
+        showToast("Silnik: " + (engine === SeestarJazzAI ? "AI (MusicRNN)" : "Proceduralny"));
+    }
+
+    btnEngineProc.addEventListener("click", function() { switchEngine(SeestarJazzProcedural); });
+    btnEngineAI.addEventListener("click", function() {
+        if (typeof Tone === "undefined" || typeof mm === "undefined") {
+            showToast("Brak Tone.js / Magenta (potrzebny internet)", true);
+            return;
+        }
+        switchEngine(SeestarJazzAI);
+    });
+
+    updateEngineLabel();
 
     function toggleJazz() {
         var on = SeestarJazz.toggle();
         jazzStatusEl.textContent = on ? "ON" : "OFF";
         jazzBadge.classList.toggle("visible", on);
         showToast(on ? "Jazz ON" : "Jazz OFF");
+        if (on) updateEngineLabel();
     }
 
     document.getElementById("btn-jazz-toggle").addEventListener("click", toggleJazz);

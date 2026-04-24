@@ -1037,6 +1037,20 @@ body:has(#jazz-panel.open) #wide-pip {
     color: #dc3545;
 }
 
+#btn-engine-proc.active,
+#btn-engine-ai.active {
+    background: #2a0000;
+    border-color: #cc3333;
+    color: #ff4444;
+}
+
+.day-mode #btn-engine-proc.active,
+.day-mode #btn-engine-ai.active {
+    background: #4a7dff;
+    border-color: #4a7dff;
+    color: #fff;
+}
+
 .day-mode .mode-btn.active {
     background: #4a7dff;
     border-color: #4a7dff;
