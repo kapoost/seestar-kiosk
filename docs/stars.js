@@ -56,12 +56,51 @@
     init();
     requestAnimationFrame(draw);
 
-    // ── Day mode toggle (D key) ──────────────────────────
-    document.addEventListener('keydown', (e) => {
-        if (e.key === 'd' || e.key === 'D') {
-            document.documentElement.classList.toggle('day-mode');
+    // ── Day mode: auto-detect (OS preference + time of day) ──
+    function autoDayMode() {
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        const prefersLight = window.matchMedia('(prefers-color-scheme: light)').matches;
+
+        if (prefersLight) {
+            document.documentElement.classList.add('day-mode');
+        } else if (prefersDark) {
+            document.documentElement.classList.remove('day-mode');
+        } else {
+            // No OS preference — fall back to time of day
+            const hour = new Date().getHours();
+            if (hour >= 6 && hour < 20) {
+                document.documentElement.classList.add('day-mode');
+            }
+        }
+    }
+
+    autoDayMode();
+
+    // React to OS theme changes in real time
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+        if (!manualOverride) {
+            if (e.matches) document.documentElement.classList.remove('day-mode');
+            else document.documentElement.classList.add('day-mode');
         }
     });
+
+    // ── Day mode toggle (D key + button) ────────────────
+    let manualOverride = false;
+
+    function toggleDayMode() {
+        manualOverride = true;
+        document.documentElement.classList.toggle('day-mode');
+    }
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'd' || e.key === 'D') {
+            toggleDayMode();
+        }
+    });
+
+    // Mobile button
+    const toggleBtn = document.getElementById('day-toggle');
+    if (toggleBtn) toggleBtn.addEventListener('click', toggleDayMode);
 
     // ── IntersectionObserver: fade-in sections ───────────
     const sectionObs = new IntersectionObserver((entries) => {
